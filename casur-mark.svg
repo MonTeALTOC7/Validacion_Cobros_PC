@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 92" role="img" aria-labelledby="title">
+  <title id="title">CASUR</title>
+  <rect width="160" height="92" rx="18" fill="#f0bc43"/>
+  <path d="M24 58c15-3 20-17 23-36 12 18 12 32-3 43" fill="none" stroke="#074333" stroke-width="7" stroke-linecap="round"/>
+  <path d="M45 26c9 3 14 8 16 15-9 0-15-5-18-13" fill="#074333"/>
+  <text x="69" y="55" font-family="Segoe UI,Arial,sans-serif" font-size="25" font-weight="800" fill="#074333">CASUR</text>
+  <text x="69" y="70" font-family="Segoe UI,Arial,sans-serif" font-size="8" font-weight="600" letter-spacing="1.1" fill="#315c50">NICARAGUA</text>
+</svg>
