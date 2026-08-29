@@ -1,26 +1,10 @@
 {
   "version": "2026-08-28",
-  "generatedAt": "2026-08-28T13:55:00-06:00",
+  "generatedAt": "2026-08-28T22:50:00-06:00",
   "files": [
-    {
-      "kind": "payroll",
-      "path": "Nomina_2026.xlsx",
-      "name": "Nomina_del01dic_al_23_Agos_26.xlsx"
-    },
-    {
-      "kind": "prefactura",
-      "path": "Prefactura_2026.xlsx",
-      "name": "prefactura_1ene-agos27-26.xlsx"
-    },
-    {
-      "kind": "master",
-      "path": "Cronologico_Maestro_2026.xlsx",
-      "name": "Cronologico_Maestro_CASUR_2026-08-24.xlsx"
-    },
-    {
-      "kind": "example",
-      "path": "Ejemplo_Control.xlsx",
-      "name": "Nomina_Prefa_Ejemplo.xlsx"
-    }
+    { "kind": "payroll", "path": "Nomina_2026.xlsx", "name": "Nomina_del01dic_al_23_Agos_26.xlsx" },
+    { "kind": "prefactura", "path": "Prefactura_2026.xlsx", "name": "prefactura_1ene-agos27-26.xlsx" },
+    { "kind": "master", "path": "Cronologico_Maestro_2026.xlsx", "name": "Cronologico_Maestro_CASUR_2026-08-24.xlsx" },
+    { "kind": "example", "path": "Ejemplo_Control.xlsx", "name": "Nomina_Prefa_Ejemplo.xlsx" }
   ]
 }
