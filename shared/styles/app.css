@@ -1,0 +1,413 @@
+/* ============================================================
+   app.css — Layout y componentes de la App Maestra
+   Mobile-first. En pantallas anchas las tarjetas pasan a rejilla.
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--navy-900);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--t-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+}
+
+/* Fondo de campo: degradado marino + resplandor superior sutil */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(120% 60% at 50% -10%, #12365F 0%, transparent 60%),
+    linear-gradient(180deg, var(--navy-800) 0%, var(--navy-900) 100%);
+}
+/* Silueta de cañaveral en el pie (elemento memorable, discreto) */
+body::after {
+  content: "";
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: 160px;
+  z-index: -1;
+  opacity: 0.35;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(88deg,
+      transparent 0 22px,
+      rgba(125, 201, 74, 0.10) 22px 24px);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 70%);
+          mask-image: linear-gradient(180deg, transparent, #000 70%);
+}
+
+button { font-family: inherit; cursor: pointer; }
+a { color: var(--teal-light); text-decoration: none; }
+
+/* ---------- Estructura ---------- */
+.app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  max-width: var(--content-max);
+  margin: 0 auto;
+}
+
+/* ---------- Header ---------- */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: calc(var(--header-h) + var(--safe-top));
+  padding: var(--safe-top) var(--sp-4) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  background: linear-gradient(180deg, rgba(8,26,51,0.92), rgba(8,26,51,0.72));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--hairline);
+}
+.header__mark {
+  width: 34px; height: 34px; border-radius: 9px;
+  flex: 0 0 auto;
+  box-shadow: var(--shadow-tile);
+}
+.header__titles { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+.header__title {
+  font-size: 1rem; font-weight: 700; letter-spacing: -0.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.header__sub { font-size: var(--t-xs); color: var(--ink-faint); }
+.header__spacer { flex: 1; }
+
+/* Indicador de conectividad */
+.conn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--t-xs); color: var(--ink-soft);
+  padding: 5px 10px; border-radius: var(--r-pill);
+  border: 1px solid var(--hairline);
+  background: var(--surface-glass);
+}
+.conn__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.conn.is-offline .conn__dot { background: var(--offline); }
+
+/* Botón de icono */
+.icon-btn {
+  width: 40px; height: 40px; border-radius: 12px;
+  display: grid; place-items: center;
+  background: var(--surface-glass);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  transition: transform .12s ease, background .2s ease;
+}
+.icon-btn:active { transform: scale(0.94); }
+.icon-btn svg { width: 20px; height: 20px; }
+
+/* ---------- Contenido ---------- */
+.main {
+  flex: 1;
+  padding: var(--sp-5) var(--sp-4);
+  padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + var(--sp-5));
+}
+
+/* Encabezado de sección del home */
+.masthead { margin: var(--sp-2) 0 var(--sp-6); }
+.masthead__eyebrow {
+  font-size: var(--t-sm); color: var(--teal-light); font-weight: 600;
+  margin: 0 0 6px;
+}
+.masthead__title {
+  font-size: var(--t-display); font-weight: 800; letter-spacing: -0.02em;
+  margin: 0; line-height: 1.08;
+}
+.masthead__desc { color: var(--ink-soft); margin: 8px 0 0; max-width: 46ch; }
+
+/* Marca corporativa CASUR en el masthead */
+.masthead__brandrow { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+.masthead__logo { height: 52px; width: auto; filter: drop-shadow(0 2px 10px rgba(0,0,0,0.4)); }
+
+/* Distintivo EM-CT (insignia animada, inspirada en la app de Cronológico) */
+.emct {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 14px; border-radius: var(--r-pill);
+  font-weight: 800; font-size: 0.8rem; letter-spacing: 0.06em;
+  color: #EAFBEF;
+  background: linear-gradient(135deg, var(--casur-green-deep), var(--casur-green));
+  border: 1px solid rgba(255,255,255,0.22);
+  box-shadow: 0 6px 16px rgba(14,125,38,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+  position: relative; overflow: hidden;
+}
+.emct__dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #EAFBEF;
+  box-shadow: 0 0 0 0 rgba(234,251,239,0.7); animation: emctPulse 2s infinite;
+}
+.emct::after { /* brillo que recorre la insignia */
+  content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,0.35), transparent);
+  transform: skewX(-18deg); animation: emctShine 3.6s ease-in-out infinite;
+}
+@keyframes emctPulse {
+  0% { box-shadow: 0 0 0 0 rgba(234,251,239,0.6); }
+  70% { box-shadow: 0 0 0 7px rgba(234,251,239,0); }
+  100% { box-shadow: 0 0 0 0 rgba(234,251,239,0); }
+}
+@keyframes emctShine { 0% { left: -60%; } 40%, 100% { left: 130%; } }
+
+/* Cabecera de panel con acción a la derecha (Centro Maestro) */
+.panel__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .emct__dot, .emct::after { animation: none; }
+}
+
+/* ---------- Tarjetas de módulo ---------- */
+.modules {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sp-3);
+}
+
+.mod-card {
+  --accent: var(--cane-lime);
+  position: relative;
+  display: grid;
+  grid-template-columns: 58px 1fr auto;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  padding-left: calc(var(--sp-4) + 6px);
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-card);
+  color: var(--ink);
+  text-align: left;
+  width: 100%;
+  transition: transform .14s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.mod-card::before { /* franja de acento */
+  content: "";
+  position: absolute; left: 0; top: 14px; bottom: 14px;
+  width: 4px; border-radius: 0 4px 4px 0;
+  background: var(--accent);
+  box-shadow: 0 0 16px var(--accent);
+  opacity: .9;
+}
+.mod-card:active { transform: scale(0.985); }
+@media (hover: hover) {
+  .mod-card:hover { border-color: var(--hairline-strong); box-shadow: var(--shadow-pop); }
+}
+.mod-card[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
+
+.mod-card__tile {
+  width: 58px; height: 58px; border-radius: 15px;
+  display: grid; place-items: center;
+  background:
+    radial-gradient(120% 120% at 30% 20%, color-mix(in srgb, var(--accent) 55%, transparent), transparent 70%),
+    var(--navy-700);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--hairline));
+  box-shadow: var(--shadow-tile);
+  color: var(--accent);
+}
+.mod-card__tile svg { width: 30px; height: 30px; }
+
+.mod-card__body { min-width: 0; }
+.mod-card__name { font-size: 1.06rem; font-weight: 700; letter-spacing: -0.01em; }
+.mod-card__meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-top: 5px; color: var(--ink-faint); font-size: var(--t-xs);
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: var(--r-pill);
+  background: var(--surface-glass); border: 1px solid var(--hairline);
+  color: var(--ink-soft); font-size: var(--t-xs);
+}
+.chip__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); }
+.chip.is-ok      .chip__dot { background: var(--ok); }
+.chip.is-online  .chip__dot { background: var(--teal-light); }
+.chip.is-offline .chip__dot { background: var(--offline); }
+.chip.is-local   .chip__dot { background: var(--cane-lime); }
+
+.mod-card__go { color: var(--ink-faint); display: grid; place-items: center; }
+.mod-card__go svg { width: 22px; height: 22px; }
+
+/* Rejilla en pantallas anchas */
+@media (min-width: 720px) {
+  .modules { grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+}
+@media (min-width: 1000px) {
+  .modules { grid-template-columns: 1fr 1fr 1fr; }
+}
+
+/* ---------- Bottom navigation (móvil) ---------- */
+.nav {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 30;
+  height: calc(var(--nav-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  background: linear-gradient(180deg, rgba(10,30,56,0.85), rgba(8,26,51,0.98));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--hairline);
+}
+.nav__item {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px;
+  background: none; border: 0; color: var(--ink-faint);
+  font-size: var(--t-xs); font-weight: 600;
+  transition: color .18s ease;
+}
+.nav__item svg { width: 23px; height: 23px; }
+.nav__item.is-active { color: var(--cane-light); }
+.nav__item.is-active svg { filter: drop-shadow(0 0 8px rgba(125,201,74,0.5)); }
+
+/* En PC la barra inferior se centra y encoge (no ocupa todo el ancho) */
+@media (min-width: 720px) {
+  .nav {
+    left: 50%; transform: translateX(-50%);
+    width: min(520px, 90%);
+    bottom: 16px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--hairline);
+    height: 60px; padding-bottom: 0;
+  }
+}
+
+/* ---------- Vista de módulo (host de iframe) ---------- */
+.module-host {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex; flex-direction: column;
+  background: var(--navy-900);
+}
+.module-host__bar {
+  height: calc(52px + var(--safe-top));
+  padding: var(--safe-top) var(--sp-3) 0;
+  display: flex; align-items: center; gap: var(--sp-2);
+  background: var(--navy-800);
+  border-bottom: 1px solid var(--hairline);
+}
+.module-host__title { font-weight: 700; font-size: var(--t-sm); }
+.module-host__frame { flex: 1; width: 100%; border: 0; background: #fff; }
+.module-host__spacer { flex: 1; }
+
+/* ---------- Paneles (Centro Maestro / Privado) ---------- */
+.panel { display: grid; gap: var(--sp-4); }
+.panel__title { font-size: var(--t-h2); font-weight: 800; letter-spacing: -0.01em; margin: 0; }
+.panel__note { color: var(--ink-soft); margin: 0; }
+
+.card {
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-card);
+  padding: var(--sp-4);
+}
+.card__head { display:flex; align-items:center; justify-content: space-between; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.card__title { font-weight: 700; }
+
+/* Fila de módulo en Centro Maestro */
+.mrow { display:flex; align-items:center; gap: var(--sp-3); padding: var(--sp-3) 0; border-top: 1px solid var(--hairline); }
+.mrow:first-of-type { border-top: 0; }
+.mrow__tile { width: 38px; height: 38px; border-radius: 10px; display:grid; place-items:center; background: var(--navy-700); color: var(--accent, var(--cane-lime)); border:1px solid var(--hairline); }
+.mrow__tile svg { width: 20px; height: 20px; }
+.mrow__body { flex: 1; min-width: 0; }
+.mrow__name { font-weight: 600; }
+.mrow__meta { font-size: var(--t-xs); color: var(--ink-faint); }
+
+/* Interruptor */
+.switch { position: relative; width: 46px; height: 28px; flex: 0 0 auto; }
+.switch input { position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+.switch__track { position:absolute; inset:0; border-radius: var(--r-pill); background: var(--navy-600); border:1px solid var(--hairline); transition: background .2s; }
+.switch__thumb { position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background: var(--ink-soft); transition: transform .2s, background .2s; }
+.switch input:checked + .switch__track { background: color-mix(in srgb, var(--cane-lime) 55%, var(--navy-600)); }
+.switch input:checked + .switch__track + .switch__thumb { transform: translateX(18px); background: var(--cane-light); }
+
+/* Estado (Centro Maestro) */
+.stat-grid { display:grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+.stat { padding: var(--sp-3); border-radius: var(--r-md); background: var(--navy-700); border:1px solid var(--hairline); }
+.stat__label { font-size: var(--t-xs); color: var(--ink-faint); }
+.stat__value { font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
+@media (min-width: 560px){ .stat-grid { grid-template-columns: repeat(4,1fr); } }
+
+/* Botones */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding: 12px 18px; border-radius: var(--r-md);
+  font-weight: 700; font-size: var(--t-sm);
+  border: 1px solid var(--hairline); background: var(--surface-glass); color: var(--ink);
+  transition: transform .12s ease, background .2s ease;
+}
+.btn:active { transform: scale(0.97); }
+.btn--primary { background: linear-gradient(180deg, var(--cane-light), var(--cane-lime)); color: var(--ink-on-lime); border: 0; }
+.btn--danger { color: #fff; background: color-mix(in srgb, var(--err) 80%, transparent); border: 0; }
+.btn--block { width: 100%; }
+
+/* ---------- Modal / gate ---------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 60;
+  display: grid; place-items: center;
+  padding: var(--sp-4);
+  background: rgba(4, 12, 24, 0.6);
+  backdrop-filter: blur(6px);
+}
+.dialog {
+  width: min(420px, 100%);
+  border-radius: var(--r-xl);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--hairline-strong);
+  box-shadow: var(--shadow-pop);
+  padding: var(--sp-6);
+  display: grid; gap: var(--sp-4);
+}
+.dialog__title { font-size: var(--t-h2); font-weight: 800; margin: 0; }
+.dialog__note { color: var(--ink-soft); font-size: var(--t-sm); margin: 0; }
+.field { display:grid; gap:6px; }
+.field label { font-size: var(--t-xs); color: var(--ink-faint); }
+.field input {
+  padding: 12px 14px; border-radius: var(--r-md);
+  background: var(--navy-700); border: 1px solid var(--hairline);
+  color: var(--ink); font-size: var(--t-body);
+}
+.field input:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
+.dialog__err { color: var(--err); font-size: var(--t-sm); min-height: 1.2em; margin: 0; }
+.dialog__row { display:flex; gap: var(--sp-3); }
+
+/* Aviso de actualización de la app (SW) */
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--nav-h) + var(--safe-bottom) + 12px);
+  z-index: 70;
+  display:flex; align-items:center; gap: var(--sp-3);
+  padding: 12px 14px; border-radius: var(--r-pill);
+  background: var(--navy-600); border: 1px solid var(--hairline-strong);
+  box-shadow: var(--shadow-pop); font-size: var(--t-sm);
+}
+.toast .btn { padding: 8px 14px; }
+
+/* Utilidades */
+.hidden { display: none !important; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+
+/* Transición suave de vistas (respeta reduce-motion) */
+.view { animation: viewIn .28s ease both; }
+@keyframes viewIn { from { opacity: 0; transform: translateY(8px);} to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce) {
+  .view { animation: none; }
+  * { scroll-behavior: auto !important; }
+}
+
+:focus-visible { outline: 2px solid var(--teal-light); outline-offset: 2px; border-radius: 6px; }
