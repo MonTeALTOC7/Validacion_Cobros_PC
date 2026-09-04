@@ -1,57 +1,18 @@
-<!DOCTYPE html>
-<html lang="es-NI">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
-  <title>Negocios de Caña CASUR</title>
-  <meta name="description" content="App Maestra de los sistemas de campo CASUR: Producción, TCH, Riego, Insumos, Inventario y Labores.">
-  <meta name="theme-color" content="#081A33">
-  <meta name="color-scheme" content="dark">
-
-  <!-- PWA: un solo manifest para toda la App Maestra -->
-  <link rel="manifest" href="manifest.webmanifest">
-
-  <!-- Iconos -->
-  <link rel="icon" href="shared/assets/icons/favicon.ico" sizes="any">
-  <link rel="icon" type="image/png" href="shared/assets/icons/favicon-48.png" sizes="48x48">
-  <link rel="apple-touch-icon" href="shared/assets/icons/apple-touch-icon.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Negocios CASUR">
-
-  <!-- Estilos (rutas relativas para GitHub Pages en subdirectorio) -->
-  <link rel="stylesheet" href="shared/styles/tokens.css">
-  <link rel="stylesheet" href="shared/styles/app.css">
-</head>
-<body>
-  <div class="app" id="app">
-    <!-- Header -->
-    <header class="header">
-      <img class="header__mark" src="shared/assets/icons/emblem-192.png" alt="" width="34" height="34">
-      <div class="header__titles">
-        <span class="header__title">Negocios de Caña CASUR</span>
-        <span class="header__sub" id="appVersion">v1.0.0</span>
-      </div>
-      <span class="header__spacer"></span>
-      <span class="conn" id="conn">
-        <span class="conn__ic" aria-hidden="true"></span>
-        <span class="conn__dot"></span>
-        <span class="conn__label">En línea</span>
-      </span>
-    </header>
-
-    <!-- Contenido dinámico -->
-    <main class="main" id="view"></main>
-
-    <!-- Navegación inferior -->
-    <nav class="nav" id="nav" aria-label="Navegación principal"></nav>
-  </div>
-
-  <noscript>
-    <p style="padding:24px;color:#EAF2E4">Esta aplicación necesita JavaScript activado.</p>
-  </noscript>
-
-  <!-- Lógica del shell como módulo ES (estándar, sin bundler) -->
-  <script type="module" src="app.js"></script>
-</body>
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b4f3c" />
+    <meta name="description" content="Conciliador semanal Nómina–Prefactura CASUR" />
+    <title>Conciliador Nómina–Prefactura CASUR</title>
+    <script type="module" crossorigin src="./assets/index-9j5sRMvi.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/react-BRnhmgIC.js">
+    <link rel="modulepreload" crossorigin href="./assets/storage-DSGY8JT7.js">
+    <link rel="modulepreload" crossorigin href="./assets/spreadsheet-TXgaev3-.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-BY74yemB.css">
+  <link rel="manifest" href="./manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="./registerSW.js"></script></head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>
