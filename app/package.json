@@ -12,7 +12,9 @@
     "compare": "node tests/e2e/compare-legacy.mjs --report-only",
     "engine": "vite-node tests/tools/run-engine.mjs --",
     "release": "npm run build && node scripts/release.mjs",
-    "verify": "npm test && npm run build && node tests/e2e/smoke.mjs"
+    "verify": "npm test && npm run build && node tests/e2e/smoke.mjs",
+    "verify:release": "node scripts/verify-release.mjs",
+    "verify:legacy": "node scripts/verify-legacy.mjs"
   },
   "dependencies": {
     "dexie": "4.4.5",

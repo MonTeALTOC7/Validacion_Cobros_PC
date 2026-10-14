@@ -44,11 +44,13 @@ export function chromePath() {
     const shell = readdirSync(base).find((d) => d.startsWith('chromium_headless_shell'));
     if (shell) return path.join(base, shell, 'chrome-linux', 'headless_shell');
   }
-  throw new Error('Defina CHROME_PATH con la ruta de Chromium/headless_shell.');
+  // Sin ruta explícita: el navegador que instala `npx playwright-core install chromium` (p. ej. en la CI).
+  return undefined;
 }
 
 export async function launch() {
-  return chromium.launch({ executablePath: chromePath() });
+  const executablePath = chromePath();
+  return chromium.launch(executablePath ? { executablePath } : {});
 }
 
 /** Abre la app, espera a que la precarga deje un análisis en IndexedDB y devuelve el estado guardado. */

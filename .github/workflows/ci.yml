@@ -1,0 +1,112 @@
+# Validación automática del conciliador (solo lectura: no publica, no fusiona, no escribe en otros repositorios).
+# - Instalación reproducible (npm ci con package-lock), formato, pruebas unitarias.
+# - Copia legacy de referencia idéntica a e7587c3.
+# - `npm run release` reproduce exactamente el build que está en la raíz (lo que sirve GitHub Pages) sin borrar
+#   archivos necesarios.
+# - Pruebas de navegador: humo (build y raíz), actualización desde v0.7 y comparación legacy (informe).
+# - Compatibilidad con la vista de labores de la App Maestra, si su repositorio es legible con el token de la CI.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: app
+    env:
+      TZ: America/Managua
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # el historial permite comparar tests/legacy con el commit e7587c3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Instalación reproducible
+        run: npm ci
+
+      - name: Formato
+        run: npx prettier --check src tests scripts
+
+      - name: Pruebas unitarias
+        run: npm test
+
+      - name: Copia legacy idéntica a la referencia
+        run: |
+          (cd tests/legacy && sha256sum -c SHA256SUMS)
+          node scripts/verify-legacy.mjs
+
+      - name: Build y release
+        run: npm run release
+
+      - name: El release coincide con la raíz versionada y conserva los archivos necesarios
+        run: |
+          node scripts/verify-release.mjs
+          cd ..
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::La raíz versionada no coincide con el build de la fuente. Ejecute 'npm run release' en app/ y versione el resultado."
+            git status --porcelain
+            exit 1
+          fi
+
+      - name: Instalar Chromium para las pruebas de navegador
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Humo (app/dist)
+        run: node tests/e2e/smoke.mjs
+
+      - name: Humo (raíz publicada)
+        run: node tests/e2e/smoke.mjs --site ..
+
+      - name: Actualización desde v0.7 en el mismo origen
+        run: node tests/e2e/upgrade.mjs
+
+      - name: Comparación con el legacy (informe, no bloquea)
+        run: node tests/e2e/compare-legacy.mjs --report-only --out ../compare-legacy.json
+
+      - name: Repositorio de la App Maestra (solo lectura)
+        id: maestra
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: MonTeALTOC7/negocios_de_cana_casur_app
+          path: maestra
+          sparse-checkout: modules/labores
+
+      - name: Compatibilidad con la vista de labores de la App Maestra
+        if: steps.maestra.outcome == 'success'
+        run: |
+          node tests/e2e/upgrade.mjs --labores ../maestra/modules/labores
+          npx vite-node tests/e2e/maestra-compat.mjs -- --labores ../maestra/modules/labores --out ../maestra-compat.json
+
+      - name: Aviso si la App Maestra no es legible
+        if: steps.maestra.outcome != 'success'
+        run: echo "::warning::No se pudo leer el repositorio de la App Maestra con el token de la CI; la regresión de compatibilidad se omitió."
+
+      - name: Informes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: informes
+          path: |
+            compare-legacy.json
+            maestra-compat.json
+          if-no-files-found: ignore
