@@ -1,0 +1,28 @@
+{
+  "name": "conciliador-casur",
+  "private": true,
+  "version": "0.8.0",
+  "description": "Conciliador Nómina–Prefactura CASUR · fuente editable",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "release": "npm run build && node scripts/release.mjs",
+    "verify": "npm test && npm run build && node tests/e2e/compare-legacy.mjs"
+  },
+  "dependencies": {
+    "dexie": "4.4.5",
+    "lucide-react": "0.468.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "xlsx": "0.18.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.7.0",
+    "playwright-core": "1.47.2",
+    "vite": "5.4.21",
+    "vite-plugin-pwa": "1.0.3",
+    "vitest": "2.1.9"
+  }
+}
