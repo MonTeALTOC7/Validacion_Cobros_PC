@@ -17,13 +17,45 @@ export const DEFAULT_PARAMETERS = {
   toleranceMJO: 0.01,
   tolerancePAQ: 0.01,
   includeHistoricalInactive: true,
+  // Nuevos en v0.8
+  atypicalTariffPct: 5,
+  tpsConfirmedExceptions: [
+    '16255|SALVADOR MARENCO CASTILLO|02',
+    '16254|JOSE ANDRES PEREZ ALEMAN|10',
+    '16257|CARLOS SIEZAR MORALES|02',
+    '16381|PANSACO|25',
+  ],
 };
 
 /** Servicios manuales que se concilian uno a uno: Nómina (base) contra Prefactura CS9999. */
 export const DIRECT_SERVICES = new Set([
-  '10005', '10007', '12001', '12005', '12007', '13001', '16013', '17009', '19014', '19020',
-  '19035', '19036', '19071', '19073', '19074', '21018', '21022', '21039', '21076', '21079',
-  '21080', '24001', '30017', '30038', '30059', '30062', '32019',
+  '10005',
+  '10007',
+  '12001',
+  '12005',
+  '12007',
+  '13001',
+  '16013',
+  '17009',
+  '19014',
+  '19020',
+  '19035',
+  '19036',
+  '19071',
+  '19073',
+  '19074',
+  '21018',
+  '21022',
+  '21039',
+  '21076',
+  '21079',
+  '21080',
+  '24001',
+  '30017',
+  '30038',
+  '30059',
+  '30062',
+  '32019',
 ]);
 
 /** Etapas de siembra que respaldan el paquete TPS (servicio SIE_INV en Prefactura). */
@@ -41,9 +73,25 @@ export const TPS_BILLED_SERVICE = 'SIE_INV';
 
 /** Servicios mecanizados (Prefactura). No tienen base en Nómina. */
 export const MECHANIZED_SERVICES = new Set([
-  '102207SL', '102208SL', '102209SL', '102211SL', '102211SP', '102217SL', '102217SP', '122212SL',
-  '122212SP', '187011SL', '187011SP', '187054SP', 'CF-100L', 'EBCM', 'EBLB', 'EBSL', 'PROPIO',
-  'SECCIONADO', 'TAPADO',
+  '102207SL',
+  '102208SL',
+  '102209SL',
+  '102211SL',
+  '102211SP',
+  '102217SL',
+  '102217SP',
+  '122212SL',
+  '122212SP',
+  '187011SL',
+  '187011SP',
+  '187054SP',
+  'CF-100L',
+  'EBCM',
+  'EBLB',
+  'EBSL',
+  'PROPIO',
+  'SECCIONADO',
+  'TAPADO',
 ]);
 
 /** Contratista CASUR cuyas prefacturas se concilian contra Nómina. */
@@ -83,4 +131,15 @@ export const STATUS_LABELS = {
   SEPARADO_CS2661: 'CS2661 separado',
   EXCEPCION_CAP_VALIDADA: 'CAP/Vuelos Verdes',
   FUERA_DE_ALCANCE: 'Fuera de alcance',
+  ETAPA_TPS_SIN_PAQUETE: 'Etapa de siembra sin TPS',
+};
+
+export const TYPE_LABELS = {
+  DIRECT: 'Manual directa',
+  TPS: 'Paquete TPS',
+  TPS_STAGE: 'Etapa de siembra',
+  EXTERNAL_TPS: 'TPS externo',
+  EXCEPTION: 'Excepción',
+  EXCLUDED: 'Excluido',
+  UNCLASSIFIED: 'Sin regla',
 };

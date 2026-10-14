@@ -1,6 +1,8 @@
 // Seguimiento de labores: universo de trabajo realizado (Nómina + mecanizadas de Prefactura).
 import { DIRECT_SERVICES, MECHANIZED_SERVICES, TPS_STAGE_SERVICES } from './constants';
 import { lotKey, normalizeText } from './normalize';
+import { isInPeriodRange, periodKey, resolveStartPeriod } from './periods';
+import { splitProducerInvoice } from './importers';
 
 /** Edad del cultivo en la fecha de la labor, desde la fecha más reciente (siembra/corte) no posterior a ella. */
 export const computeAge = (masterRow, date) => {
@@ -70,8 +72,15 @@ const classify = (row, manualServices) => {
   return 'Sin clasificar';
 };
 
-/** Filas de actividad de Nómina y Prefactura desde `startDate`, con productor, ámbito, clase y edad. */
+/** Nombre de productor sin el sufijo "FACTURA :n" (compatible con filas guardadas por v0.7). */
+const producerNameOf = (row) => row.producerName ?? normalizeText(splitProducerInvoice(row.producer).name);
+
+/**
+ * Filas de actividad de Nómina y Prefactura desde el período operativo que contiene `startDate`,
+ * con productor, ámbito, clase y edad.
+ */
 export function buildActivityRows(inputs, startDate) {
+  const startPeriod = resolveStartPeriod([...inputs.payroll, ...inputs.prefactura], startDate);
   const masterByLot = new Map();
   inputs.master.forEach((row) => {
     const key = lotKey(row.hacienda, row.suerte);
@@ -79,9 +88,10 @@ export function buildActivityRows(inputs, startDate) {
   });
   const producersByHacienda = new Map();
   inputs.prefactura.forEach((row) => {
-    if (!row.producer.trim()) return;
+    const name = producerNameOf(row);
+    if (!name) return;
     const set = producersByHacienda.get(row.hacienda) ?? new Set();
-    set.add(normalizeText(row.producer));
+    set.add(name);
     producersByHacienda.set(row.hacienda, set);
   });
   const producerHaciendas = new Set(inputs.master.filter((row) => row.producerScope).map((row) => row.hacienda));
@@ -92,10 +102,10 @@ export function buildActivityRows(inputs, startDate) {
     ['Prefactura', inputs.prefactura],
   ]) {
     for (const row of rows) {
-      if (row.date < startDate) continue;
+      if (row.year != null ? !isInPeriodRange(row, startPeriod) : row.date < startDate) continue;
       const master = masterByLot.get(lotKey(row.hacienda, row.suerte));
       const known = producersByHacienda.get(row.hacienda);
-      const ownProducer = 'producer' in row ? normalizeText(row.producer) : '';
+      const ownProducer = 'producer' in row ? producerNameOf(row) : '';
       const producer = ownProducer || (known?.size === 1 ? [...known][0] : row.hacienda + ' · titular sin confirmar');
       const scope =
         master?.producerScope || producerHaciendas.has(row.hacienda) || ownProducer
@@ -107,6 +117,8 @@ export function buildActivityRows(inputs, startDate) {
         id: source + ':' + row.id,
         source,
         sourceRow: row.sourceRow,
+        sourceFile: row.sourceFile,
+        sourceSheet: row.sourceSheet,
         date: row.date,
         week: row.week,
         producer,
@@ -123,6 +135,10 @@ export function buildActivityRows(inputs, startDate) {
         classification: classify(row, manualServices),
         scope,
         ...computeAge(master, row.date),
+        year: row.year ?? null,
+        period: row.year != null ? periodKey(row.year, row.week) : '',
+        tariff: 'tariff' in row ? row.tariff : null,
+        payrollTariff: 'payrollTariff' in row ? row.payrollTariff : null,
       });
     }
   }

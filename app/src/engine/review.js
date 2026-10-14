@@ -1,6 +1,7 @@
 // Revisión por Correo: valida un reporte de cobros recibido (CS9999) contra la Nómina del período solicitado.
 import { DIRECT_SERVICES, TPS_STAGE_SERVICES } from './constants';
 import { hashId, lotKey, round, sumBy, withinTolerance } from './normalize';
+import { operationalYear } from './periods';
 
 export const REVIEW_STATUS_LABELS = {
   CORRECTO: 'Cobro correcto',
@@ -26,7 +27,9 @@ export const parseReviewKey = (key) => {
 export const reviewTolerance = () => 0.01;
 
 export const isReviewComparable = (finding) =>
-  finding.payrollUnits > 0 && finding.reviewUnits > 0 && ['CORRECTO', 'COBRO_EXCESO', 'TOTAL_INCORRECTO'].includes(finding.status);
+  finding.payrollUnits > 0 &&
+  finding.reviewUnits > 0 &&
+  ['CORRECTO', 'COBRO_EXCESO', 'TOTAL_INCORRECTO'].includes(finding.status);
 
 export const reviewStatus = (payrollUnits, reviewUnits, unit) => {
   if (withinTolerance(payrollUnits, reviewUnits, reviewTolerance(unit))) return { status: 'CORRECTO', severity: 'ok' };
@@ -79,9 +82,10 @@ export const buildReviewFinding = (key, unit, payrollGroup, reviewGroup) => {
     services: [...new Set(payrollGroup?.rows.map((row) => row.service) ?? [])],
     serviceNames: [
       ...new Set(
-        [...(payrollGroup?.rows.map((row) => row.serviceName) ?? []), ...(reviewGroup?.rows.map((row) => row.serviceName) ?? [])].filter(
-          Boolean,
-        ),
+        [
+          ...(payrollGroup?.rows.map((row) => row.serviceName) ?? []),
+          ...(reviewGroup?.rows.map((row) => row.serviceName) ?? []),
+        ].filter(Boolean),
       ),
     ],
     unit,
@@ -143,7 +147,9 @@ export const runReview = (inputs, reviewRows, weekStart, weekEnd) => {
         reviewHaciendas.has(row.hacienda)),
   );
   const outsidePeriod = reviewRows.filter((row) => row.week < weekStart || row.week > weekEnd);
-  const unexpectedContractor = reviewRows.filter((row) => row.week >= weekStart && row.week <= weekEnd && row.contractorCode !== 'CS9999');
+  const unexpectedContractor = reviewRows.filter(
+    (row) => row.week >= weekStart && row.week <= weekEnd && row.contractorCode !== 'CS9999',
+  );
   const comparable = reviewRows.filter((row) => row.week >= weekStart && row.week <= weekEnd && row.contractorCode === 'CS9999');
   const payrollGroups = groupPayrollForReview(payroll);
   const reviewGroups = groupReviewRows(comparable);
@@ -165,7 +171,11 @@ export const runReview = (inputs, reviewRows, weekStart, weekEnd) => {
         ...parseReviewKey(key),
         services: [...new Set(payrollGroup.rows.map((row) => row.service))],
         serviceNames: [
-          ...new Set([...payrollGroup.rows.map((row) => row.serviceName), ...reviewGroup.rows.map((row) => row.serviceName)].filter(Boolean)),
+          ...new Set(
+            [...payrollGroup.rows.map((row) => row.serviceName), ...reviewGroup.rows.map((row) => row.serviceName)].filter(
+              Boolean,
+            ),
+          ),
         ],
         unit: payrollUnit,
         reviewUnit,
@@ -194,7 +204,11 @@ export const runReview = (inputs, reviewRows, weekStart, weekEnd) => {
   );
   unexpectedContractor.forEach((row) =>
     findings.push(
-      buildReviewSpecialFinding(row, 'CONTRATISTA_NO_ESPERADO', `El prestador ${row.contractorCode || row.contractor} no corresponde a CS9999.`),
+      buildReviewSpecialFinding(
+        row,
+        'CONTRATISTA_NO_ESPERADO',
+        `El prestador ${row.contractorCode || row.contractor} no corresponde a CS9999.`,
+      ),
     ),
   );
   findings.sort((a, b) => a.week - b.week || a.hacienda.localeCompare(b.hacienda) || a.suerte.localeCompare(b.suerte));
@@ -219,5 +233,8 @@ export const runReview = (inputs, reviewRows, weekStart, weekEnd) => {
   };
 };
 
-/** Año con el que se compara una fila de Nómina contra el AÑO del reporte recibido. */
-const reviewYearOf = (row) => Number(row.date.slice(0, 4));
+/**
+ * Año con el que se compara una fila de Nómina contra el AÑO del reporte recibido: el año operativo
+ * SIAGRI (las semanas 1–2 pueden tener fechas de diciembre del año anterior).
+ */
+const reviewYearOf = (row) => row.year ?? operationalYear(row.date, row.week);

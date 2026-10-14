@@ -22,7 +22,7 @@ const fetchFile = async (path, name, lastModified) => {
   return new File([blob], name, { type: blob.type, lastModified });
 };
 
-/** Lee datos/manifest.json y procesa cada archivo con su importador. */
+/** Lee datos/manifest.json y procesa cada archivo con su importador. Devuelve { inputs, version } o null. */
 export const loadPreloadedInputs = async () => {
   const manifest = await fetchJson('./datos/manifest.json');
   if (!manifest) return null;
@@ -34,7 +34,7 @@ export const loadPreloadedInputs = async () => {
     parsed.file.source = 'PRELOADED';
     inputs.files.push(parsed.file);
   }
-  return inputs;
+  return { inputs, version: manifest.version ?? '' };
 };
 
 /**
@@ -62,7 +62,11 @@ export const refreshMasterFromPreload = async (inputs) => {
 export const loadPreloadedReview = async () => {
   const manifest = await fetchJson('./datos/revision-manifest.json');
   if (!manifest) return null;
-  const file = await fetchFile(`./datos/${manifest.file.path}`, manifest.file.name, Date.parse(manifest.generatedAt) || Date.now());
+  const file = await fetchFile(
+    `./datos/${manifest.file.path}`,
+    manifest.file.name,
+    Date.parse(manifest.generatedAt) || Date.now(),
+  );
   const parsed = await parseReviewFile(file);
   parsed.file.source = 'PRELOADED';
   return {

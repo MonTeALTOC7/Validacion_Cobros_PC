@@ -71,13 +71,19 @@ export function buildApplicationEpisodes(rows, master, rules) {
     list.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
     const first = list[0];
     const masterRows = masterByLot.get(lotKey(first.hacienda, first.suerte)) ?? [];
-    const areas = [...new Set(masterRows.map((row) => row.area).filter((area) => typeof area === 'number' && Number.isFinite(area) && area > 0))];
+    const areas = [
+      ...new Set(
+        masterRows.map((row) => row.area).filter((area) => typeof area === 'number' && Number.isFinite(area) && area > 0),
+      ),
+    ];
     const area = areas.length === 1 ? areas[0] : null;
     const candidate = rules.overrides[ruleKey(first)] ?? rules.base;
     const rule = isValidRule(candidate) ? { ...candidate } : { ...DEFAULT_APPLICATION_RULE };
     const cycleDates = [
       ...new Set(
-        masterRows.flatMap((row) => [row.plantingDate, row.lastCutDate]).filter((date) => !!date && Number.isFinite(dateToDayNumber(date))),
+        masterRows
+          .flatMap((row) => [row.plantingDate, row.lastCutDate])
+          .filter((date) => !!date && Number.isFinite(dateToDayNumber(date))),
       ),
     ].sort();
     const cycleOf = (date) => cycleDates.filter((cycleDate) => cycleDate <= date).at(-1) ?? '';
@@ -91,7 +97,9 @@ export function buildApplicationEpisodes(rows, master, rules) {
       const quantity = quantityOf(current);
       const isHa = first.unit === 'HA';
       const equivalent = isHa && area ? quantity / area : null;
-      const invalid = current.some((row) => !Number.isFinite(dateToDayNumber(row.date)) || !Number.isFinite(row.units) || row.units <= 0);
+      const invalid = current.some(
+        (row) => !Number.isFinite(dateToDayNumber(row.date)) || !Number.isFinite(row.units) || row.units <= 0,
+      );
       let status;
       if (invalid) status = 'REVISAR';
       else if (!isHa) status = 'NO_HA';
@@ -139,7 +147,8 @@ export function buildApplicationEpisodes(rows, master, rules) {
       if (current.length) {
         const gap = dateToDayNumber(date) - dateToDayNumber(current.at(-1).date);
         const span = dateToDayNumber(date) - dateToDayNumber(current[0].date);
-        const areaReached = first.unit === 'HA' && area !== null && quantityOf(current) >= area * (1 - rule.tolerancePct / 100) - EPSILON;
+        const areaReached =
+          first.unit === 'HA' && area !== null && quantityOf(current) >= area * (1 - rule.tolerancePct / 100) - EPSILON;
         if (
           !Number.isFinite(gap) ||
           gap > rule.gapDays ||
