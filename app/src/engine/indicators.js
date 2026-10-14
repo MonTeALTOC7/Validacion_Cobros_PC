@@ -91,3 +91,42 @@ export const weekSummaries = (analysis) => {
  */
 export const closureFingerprint = (inputs, parameters) =>
   hashId(...inputs.files.map((file) => file.kind + ':' + file.hash).sort(), JSON.stringify(parameters));
+
+/**
+ * Pendientes de cobro por período, separando semanas que ya tienen Prefactura de semanas que aún no la tienen
+ * (por ejemplo, las posteriores a la última semana del reporte). Los pendientes de semanas sin Prefactura no
+ * son necesariamente faltas de cobro: el reporte todavía no las cubre.
+ */
+export const pendingBreakdown = (analysis) => {
+  const billed = new Set(analysis.coverage?.billedPeriods ?? []);
+  const known = billed.size > 0;
+  const byPeriod = new Map();
+  for (const finding of analysis.findings.filter(isBlockingPending)) {
+    const period = findingPeriod(finding);
+    const entry = byPeriod.get(period) ?? {
+      period,
+      covered: known ? billed.has(period) : null,
+      cases: 0,
+      unpaid: 0,
+      partial: 0,
+      byStatus: {},
+      byUnit: {},
+    };
+    entry.cases += 1;
+    if (collectionState(finding) === 'PARCIAL') entry.partial += 1;
+    else entry.unpaid += 1;
+    entry.byStatus[finding.status] = (entry.byStatus[finding.status] ?? 0) + 1;
+    const units = collectionState(finding) === 'PARCIAL' ? Math.max(0, finding.payrollUnits - finding.billedUnits) : finding.payrollUnits;
+    entry.byUnit[finding.unit] = Math.round(((entry.byUnit[finding.unit] ?? 0) + units) * 100) / 100;
+    byPeriod.set(period, entry);
+  }
+  const periods = [...byPeriod.values()].sort((a, b) => comparePeriods(a.period, b.period));
+  const sum = (list) => list.reduce((total, entry) => total + entry.cases, 0);
+  return {
+    periods,
+    inBilledWeeks: sum(periods.filter((entry) => entry.covered === true)),
+    inUnbilledWeeks: sum(periods.filter((entry) => entry.covered === false)),
+    unknown: sum(periods.filter((entry) => entry.covered === null)),
+    lastBilledPeriod: [...billed].sort(comparePeriods).at(-1) ?? '',
+  };
+};

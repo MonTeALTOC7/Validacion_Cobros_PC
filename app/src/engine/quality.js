@@ -3,11 +3,13 @@
 import { CASUR_CONTRACTOR, DIRECT_SERVICES, MECHANIZED_SERVICES, TPS_BILLED_SERVICE, TPS_STAGE_SERVICES } from './constants';
 import { SKIP_REASON_LABELS } from './importers';
 import { groupBy, lotKey, round } from './normalize';
-import { buildOfficialCalendar, periodKey } from './periods';
+import { buildOfficialCalendar, parsePeriodKey, periodKey } from './periods';
 import { classifyRepetitions } from './repetitions';
 import { buildTariffProfile, isAtypicalTariff } from './tariffs';
 
 const MAX_EXAMPLES = 12;
+/** Número legible para los ejemplos (evita 333.28000000000003). */
+const num = (value) => (Number.isFinite(value) ? String(Math.round(value * 10000) / 10000) : String(value));
 const KIND_LABELS = { payroll: 'Nómina', prefactura: 'Prefactura', master: 'Maestro' };
 
 const example = (source, row, detail) => ({
@@ -59,18 +61,43 @@ export const assessDataQuality = (inputs, options = {}) => {
     });
   }
 
-  // 2. Fechas fuera del rango oficial de su semana (columna Periodo de Prefactura)
+  // 2. Fechas fuera del rango de su semana.
+  //    Oficial: columna Periodo de la Prefactura. Inferido: para semanas del mismo año operativo sin Periodo
+  //    (p. ej. S01 o semanas posteriores a la última Prefactura), se extrapola el calendario oficial asumiendo
+  //    semanas consecutivas de lunes a domingo, que es lo verificado en las 38 semanas publicadas.
   const calendar = buildOfficialCalendar(prefactura);
   if (calendar.size) {
+    const anchors = new Map();
+    for (const [key, range] of calendar) {
+      const { year, week } = parsePeriodKey(key);
+      if (!anchors.has(year) || week < anchors.get(year).week) anchors.set(year, { week, start: range.start });
+    }
+    const inferredRange = (row) => {
+      const anchor = anchors.get(row.year);
+      if (!anchor) return null;
+      const start = new Date(`${anchor.start}T12:00:00Z`);
+      start.setUTCDate(start.getUTCDate() + 7 * (row.week - anchor.week));
+      const end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 6);
+      return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+    };
     const outside = [];
+    const outsideInferred = [];
     for (const [source, rows] of [
       ['Nómina', payroll],
       ['Prefactura', prefactura],
     ]) {
       rows.forEach((row) => {
-        const range = calendar.get(periodKey(row.year, row.week));
-        if (range && (row.date < range.start || row.date > range.end)) {
-          outside.push(example(source, row, `Fecha ${row.date} fuera de la semana oficial ${range.start} → ${range.end}`));
+        const official = calendar.get(periodKey(row.year, row.week));
+        if (official) {
+          if (row.date < official.start || row.date > official.end) {
+            outside.push(example(source, row, `Fecha ${row.date} fuera de la semana oficial ${official.start} → ${official.end}`));
+          }
+          return;
+        }
+        const inferred = inferredRange(row);
+        if (inferred && (row.date < inferred.start || row.date > inferred.end)) {
+          outsideInferred.push(example(source, row, `Fecha ${row.date} fuera del rango inferido ${inferred.start} → ${inferred.end}`));
         }
       });
     }
@@ -82,6 +109,17 @@ export const assessDataQuality = (inputs, options = {}) => {
           'Fechas fuera de su semana operativa',
           'La fecha no cae dentro del rango que la Prefactura publica para esa semana (columna Periodo). La fila se concilia en la semana indicada por SIAGRI.',
           outside,
+        ),
+      );
+    }
+    if (outsideInferred.length) {
+      issues.push(
+        issue(
+          'date-outside-inferred-week',
+          'info',
+          'Fechas fuera del rango inferido de su semana',
+          'Semanas sin columna Periodo (anteriores o posteriores a la Prefactura cargada): el rango se infiere del calendario oficial (semanas consecutivas de lunes a domingo). Verifique la fecha o la semana en SIAGRI.',
+          outsideInferred,
         ),
       );
     }
@@ -128,7 +166,7 @@ export const assessDataQuality = (inputs, options = {}) => {
         severity,
         title(summary),
         detail(summary),
-        rows.map((row) => example('Prefactura', row, `P.FACT ${row.pFact} · ${row.service} · ${row.units} ${row.unit} × ${row.tariff} = ${row.total}`)),
+        rows.map((row) => example('Prefactura', row, `P.FACT ${row.pFact} · ${row.service} · ${num(row.units)} ${row.unit} × ${num(row.tariff)} = ${num(row.total)}`)),
       ),
       count: kind === 'DUPLICADO_EXACTO' || kind === 'COBRO_EN_OTRA_PREFACTURA' ? summary.extraRows : summary.groups,
       amount: summary.extraAmount,
@@ -159,7 +197,7 @@ export const assessDataQuality = (inputs, options = {}) => {
         'Prefactura: Total distinto de Tarifa × Unidades',
         'Diferencia mayor a C$ 0.02 entre el total informado y la multiplicación.',
         badTotals.map((row) =>
-          example('Prefactura', row, `${row.units} × ${row.tariff} = ${round(row.units * row.tariff, 2)} ≠ ${row.total}`),
+          example('Prefactura', row, `${num(row.units)} × ${num(row.tariff)} = ${round(row.units * row.tariff, 2)} ≠ ${num(row.total)}`),
         ),
       ),
     );
@@ -177,7 +215,7 @@ export const assessDataQuality = (inputs, options = {}) => {
         `Tarifas que representan menos del ${options.atypicalTariffPct ?? 5} % de las filas de su servicio y UM. Indicador para revisar; no implica error.`,
         atypical.map((row) => {
           const usual = profile.get(`${row.service}|${row.unit}`)?.mostFrequent;
-          return example('Prefactura', row, `${row.service} ${row.unit}: tarifa ${row.tariff} (más frecuente ${usual})`);
+          return example('Prefactura', row, `${row.service} ${row.unit}: tarifa ${num(row.tariff)} (más frecuente ${num(usual)})`);
         }),
       ),
     );

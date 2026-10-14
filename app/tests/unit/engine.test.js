@@ -309,3 +309,19 @@ describe('paquetes TPS', () => {
     });
   });
 });
+
+describe('pendientes por cobertura de Prefactura', () => {
+  it('separa pendientes de semanas prefacturadas y de semanas aún sin Prefactura', async () => {
+    const { pendingBreakdown } = await import('../../src/engine/indicators');
+    const analysis = await run({
+      payroll: [payrollRow(), payrollRow({ Labor: 'CQM', Servicio: '32019' }), payrollRow({ Semana: '12', Fecha: day('2026-03-16') })],
+      prefactura: [prefacturaRow()],
+    });
+    const breakdown = pendingBreakdown(analysis);
+    expect(breakdown).toMatchObject({ inBilledWeeks: 1, inUnbilledWeeks: 1, lastBilledPeriod: '2026-S10' });
+    expect(breakdown.periods.map((entry) => [entry.period, entry.covered, entry.cases])).toEqual([
+      ['2026-S10', true, 1],
+      ['2026-S12', false, 1],
+    ]);
+  });
+});

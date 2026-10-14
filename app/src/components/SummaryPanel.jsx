@@ -10,6 +10,7 @@ import {
   isBlockingPending,
   unitTotalsByState,
   weekSummaries,
+  pendingBreakdown,
 } from '../engine/indicators';
 import { comparePeriods, parsePeriodKey } from '../engine/periods';
 import { formatCurrency, formatNumber } from '../lib/format';
@@ -112,7 +113,7 @@ export function SummaryPanel({ analysis, inputs, quality = [], multiYear, onNavi
   );
   const excess = payrollCases.filter((f) => f.status === 'COBRO_EXCESO' && collectionState(f) === 'COBRADO');
   const duplicates = scoped.filter(
-    (f) => (f.flags ?? []).includes('DUPLICADO_POTENCIAL') || (f.flags ?? []).includes('REPETICION_RESPALDADA'),
+    (f) => ['DUPLICADO_POTENCIAL', 'REPETICION_RESPALDADA', 'COBRO_EN_OTRA_PREFACTURA'].some((flag) => (f.flags ?? []).includes(flag)),
   );
   const pendingUnits = unitTotalsByState(payrollCases, 'pending');
   const excessUnits = unitTotalsByState(payrollCases, 'excess');
@@ -138,6 +139,9 @@ export function SummaryPanel({ analysis, inputs, quality = [], multiYear, onNavi
 
   const priority = payrollCases.filter(isBlockingPending).slice(0, 8);
   const pendingWeeks = weekSummaries({ findings: scoped }).filter((week) => week.pending > 0);
+  const breakdown = pendingBreakdown({ findings: scoped, coverage: analysis.coverage });
+  const billedPeriods = new Set(analysis.coverage.billedPeriods ?? []);
+  const hasCoverageInfo = billedPeriods.size > 0;
   const qualityIssues = quality.filter((item) => item.severity !== 'info');
 
   return (
@@ -244,7 +248,11 @@ export function SummaryPanel({ analysis, inputs, quality = [], multiYear, onNavi
         <SummaryKpi
           title="Sin prefacturar"
           value={coverage.unpaid.toString()}
-          note="Nómina sin cobro acreditado · ver detalle"
+          note={
+            hasCoverageInfo
+              ? `${breakdown.inBilledWeeks} en semanas ya prefacturadas · ${breakdown.inUnbilledWeeks} en semanas aún sin Prefactura (después de ${periodText(breakdown.lastBilledPeriod, multiYear)}) · ver detalle`
+              : 'Nómina sin cobro acreditado · ver detalle'
+          }
           tone="red"
           icon={TriangleAlert}
           onClick={() => openDrill('unpaid')}
@@ -306,9 +314,11 @@ export function SummaryPanel({ analysis, inputs, quality = [], multiYear, onNavi
         <button className="alert-strip warning" onClick={() => openDrill('duplicates')}>
           <TriangleAlert size={18} />
           <span>
-            <strong>Prefactura con filas idénticas:</strong> {analysis.duplicateExtraRows ?? analysis.duplicateGroups} copia(s)
-            extra por {formatCurrency(analysis.duplicateExtraAmount ?? 0)} en todo el período. {duplicates.length} caso(s)
-            conciliable(s) afectados en esta vista. No se eliminan: revise si son doble registro.
+            <strong>Posibles duplicados en Prefactura (incluidos en el total, sin descontar):</strong>{' '}
+            {analysis.duplicateExtraRows ?? analysis.duplicateGroups} copia(s) exacta(s) por {formatCurrency(analysis.duplicateExtraAmount ?? 0)}
+            {analysis.repetitions?.COBRO_EN_OTRA_PREFACTURA?.extraRows > 0 &&
+              ` · ${analysis.repetitions.COBRO_EN_OTRA_PREFACTURA.extraRows} cobro(s) repetido(s) en otra prefactura por ${formatCurrency(analysis.repetitions.COBRO_EN_OTRA_PREFACTURA.extraAmount)}`}
+            . {duplicates.length} caso(s) conciliable(s) afectados en esta vista. No se eliminan: revise si son doble registro.
           </span>
           <em>Ver casos →</em>
         </button>
@@ -365,7 +375,10 @@ export function SummaryPanel({ analysis, inputs, quality = [], multiYear, onNavi
                 aria-label={`Ver ${week.pending} pendientes de ${periodLongText(week.period, multiYear)}`}
               >
                 <div className="bar-track">
-                  <span style={{ height: `${Math.max(5, week.total ? (week.pending / week.total) * 100 : 0)}%` }} />
+                  <span
+                    className={hasCoverageInfo && !billedPeriods.has(week.period) ? 'bar-unbilled' : ''}
+                    style={{ height: `${Math.max(5, week.total ? (week.pending / week.total) * 100 : 0)}%` }}
+                  />
                 </div>
                 <strong>{periodText(week.period, multiYear)}</strong>
                 <small>{week.pending}</small>
@@ -374,11 +387,59 @@ export function SummaryPanel({ analysis, inputs, quality = [], multiYear, onNavi
           </div>
           <div className="chart-legend">
             <span>
-              <i className="legend-red" /> Sin cobro o cobro parcial
+              <i className="legend-red" /> Sin cobro o cobro parcial en semana ya prefacturada
             </span>
+            {hasCoverageInfo && (
+              <span>
+                <i className="legend-unbilled" /> Semana aún sin Prefactura
+              </span>
+            )}
             <span>Haga clic en una semana para investigar</span>
           </div>
         </section>
+        {hasCoverageInfo && breakdown.periods.length > 0 && (
+          <section className="panel pending-breakdown">
+            <div className="panel-head">
+              <div>
+                <h2>Pendientes por semana y cobertura de Prefactura</h2>
+                <p>
+                  Última semana con Prefactura: {periodLongText(breakdown.lastBilledPeriod, true)}. Los pendientes de semanas posteriores
+                  no son necesariamente faltas de cobro: el reporte todavía no las cubre.
+                </p>
+              </div>
+            </div>
+            <div className="table-wrap compact-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Semana</th>
+                    <th>Prefactura</th>
+                    <th className="num">Sin cobro</th>
+                    <th className="num">Parcial</th>
+                    <th>Unidades pendientes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {breakdown.periods.map((entry) => (
+                    <tr key={entry.period} className="clickable" onClick={() => openDrill('pending', entry.period)}>
+                      <td>
+                        <strong>{periodLongText(entry.period, multiYear)}</strong>
+                      </td>
+                      <td>{entry.covered ? 'Prefacturada' : <span className="flag flag-info">Aún sin Prefactura</span>}</td>
+                      <td className="num">{entry.unpaid}</td>
+                      <td className="num">{entry.partial}</td>
+                      <td>
+                        {Object.entries(entry.byUnit)
+                          .map(([unit, units]) => `${formatNumber(units)} ${unit}`)
+                          .join(' · ')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
         <section className="panel health-panel">
           <div className="panel-head">
             <div>

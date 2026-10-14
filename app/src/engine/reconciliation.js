@@ -659,6 +659,10 @@ export const runReconciliation = (inputs, parameters) => {
       endPeriod: periods.at(-1) ?? '',
       periods,
       multiYear: new Set(periods.map((period) => period.slice(0, 4))).size > 1,
+      // Semanas con al menos una fila de Prefactura: distingue pendientes de semanas aún no prefacturadas.
+      billedPeriods: [...new Set(prefactura.filter((row) => row.year != null).map((row) => periodKey(row.year, row.week)))].sort(
+        comparePeriods,
+      ),
     },
     startPeriod: startPeriod ? periodKey(startPeriod.year, startPeriod.week) : '',
     parameters: params,

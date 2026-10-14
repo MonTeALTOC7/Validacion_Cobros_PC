@@ -559,3 +559,22 @@ td.num {
     white-space: normal;
   }
 }
+
+/* Pendientes en semanas aún sin Prefactura */
+.bar-track span.bar-unbilled {
+  background: repeating-linear-gradient(135deg, #8fb4cc, #8fb4cc 4px, #c9dceb 4px, #c9dceb 8px);
+}
+.legend-unbilled {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: #8fb4cc;
+  margin-right: 4px;
+}
+.pending-breakdown tr.clickable {
+  cursor: pointer;
+}
+.summary-grid .pending-breakdown {
+  grid-column: 1 / -1;
+}

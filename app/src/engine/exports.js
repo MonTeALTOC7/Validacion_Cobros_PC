@@ -1,7 +1,7 @@
 // Exportaciones a Excel (informe de auditoría y revisión por correo).
 import { utils as XLSXUtils, write as writeWorkbook } from 'xlsx';
 import { APP_VERSION, BUILD_DATE, STATUS_LABELS, TYPE_LABELS } from './constants';
-import { COLLECTION_STATE_LABELS, collectionState, coverageStats, findingPeriod, isBlockingPending } from './indicators';
+import { COLLECTION_STATE_LABELS, collectionState, coverageStats, findingPeriod, isBlockingPending, pendingBreakdown } from './indicators';
 import { FLAG_LABELS } from './reconciliation';
 import { downloadBlob } from '../lib/format';
 
@@ -118,6 +118,20 @@ export const exportAuditWorkbook = (analysis, inputs, { parameters = analysis.pa
     'TPS',
   );
   appendSheet(workbook, analysis.findings.filter(isBlockingPending).map(findingToExportRow), 'Pendientes');
+  const breakdown = pendingBreakdown(analysis);
+  appendSheet(
+    workbook,
+    breakdown.periods.map((entry) => ({
+      Período: entry.period,
+      'Cobertura de Prefactura': entry.covered === null ? 'Sin información' : entry.covered ? 'Prefacturada' : 'Aún sin Prefactura',
+      'Casos sin cobro': entry.unpaid,
+      'Casos parciales': entry.partial,
+      'Unidades pendientes': Object.entries(entry.byUnit)
+        .map(([unit, units]) => `${units} ${unit}`)
+        .join(' · '),
+    })),
+    'Pendientes por semana',
+  );
   appendSheet(workbook, originRows(analysis, inputs), 'Origen');
   appendSheet(
     workbook,

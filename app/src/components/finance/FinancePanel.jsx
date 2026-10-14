@@ -146,9 +146,9 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
         Suertes: group.lots,
         'Área física (ha)': group.area,
         'Suertes con área': group.lotsWithArea,
-        'C$ por ha de suerte': group.perHa ?? '',
+        'Prefacturado C$ por ha de suerte (no es costo total)': group.perHa ?? '',
         'HA trabajadas': group.haUnits,
-        'C$ por HA trabajada': group.perHaWorked ?? '',
+        'Prefacturado C$ por HA trabajada (UM HA)': group.perHaWorked ?? '',
         ...Object.fromEntries(FINANCE_CLASS_ORDER.map((key) => [FINANCE_CLASSES[key], group.byClass[key] ?? 0])),
         'Primera semana': group.firstPeriod,
         'Última semana': group.lastPeriod,
@@ -169,9 +169,9 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
               Fincas: overall.haciendas,
               Suertes: overall.lots,
               'Área física (ha)': overall.area,
-              'C$ por ha de suerte': overall.perHa ?? '',
+              'Prefacturado C$ por ha de suerte (no es costo total)': overall.perHa ?? '',
               'HA trabajadas': overall.haUnits,
-              'C$ por HA trabajada': overall.perHaWorked ?? '',
+              'Prefacturado C$ por HA trabajada (UM HA)': overall.perHaWorked ?? '',
               Fuente: 'Columna Total de la Prefactura SIAGRI (sin recalcular ni descontar)',
               ...Object.fromEntries(summary.byUniverse.map((group) => [`Universo · ${group.label}`, group.total])),
               'Posibles duplicados exactos (copias, sin descontar)': repetitions.DUPLICADO_EXACTO.extraAmount,
@@ -266,7 +266,7 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
     },
     { key: 'lots', label: 'Suertes', num: true },
     { key: 'area', label: 'Área ha', num: true, render: (group) => (group.lotsWithArea ? formatNumber(group.area) : '—') },
-    { key: 'perHa', label: 'C$/ha suerte', num: true, render: (group) => perHaText(group.perHa) },
+    { key: 'perHa', label: 'Prefact. C$/ha suerte', num: true, render: (group) => perHaText(group.perHa) },
     ...['MANUAL', 'MECANIZADA', 'TPS'].map((key) => ({
       key: `class-${key}`,
       label: FINANCE_CLASSES[key].replace(' (siembra)', ''),
@@ -705,7 +705,7 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
           <div className="panel-head">
             <div>
               <h3>Facturación por suerte</h3>
-              <p>Área física de la suerte (Maestro; si falta, la informada en Prefactura). HA trabajadas = unidades con UM HA.</p>
+              <p>Área física de la suerte (Maestro; si falta, la informada en Prefactura). HA trabajadas = unidades con UM HA. “Prefact. C$/ha” es el monto de Prefactura por hectárea física, no el costo total de producción.</p>
             </div>
           </div>
           <DataTable
@@ -726,7 +726,7 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
                 num: true,
                 render: (group) => (group.lotsWithArea ? formatNumber(group.area) : '—'),
               },
-              { key: 'perHa', label: 'C$/ha', num: true, render: (group) => perHaText(group.perHa) },
+              { key: 'perHa', label: 'Prefact. C$/ha', num: true, render: (group) => perHaText(group.perHa) },
               { key: 'haUnits', label: 'HA trabajadas', num: true, render: (group) => formatNumber(group.haUnits) },
               {
                 key: 'cycles',
