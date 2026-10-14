@@ -19,11 +19,45 @@ export const REPETITION_KINDS = {
 };
 
 const EXACT_FIELDS = [
-  'year', 'week', 'date', 'haciendaCode', 'hacienda', 'suerte', 'labor', 'laborName', 'service', 'serviceName', 'unit',
-  'units', 'tariff', 'total', 'pFact', 'producerCode', 'producer', 'contractorCode', 'contractor', 'periodStart',
-  'periodEnd', 'lotArea', 'tenureGroup', 'interfaceStatus',
+  'year',
+  'week',
+  'date',
+  'haciendaCode',
+  'hacienda',
+  'suerte',
+  'labor',
+  'laborName',
+  'service',
+  'serviceName',
+  'unit',
+  'units',
+  'tariff',
+  'total',
+  'pFact',
+  'producerCode',
+  'producer',
+  'contractorCode',
+  'contractor',
+  'periodStart',
+  'periodEnd',
+  'lotArea',
+  'tenureGroup',
+  'interfaceStatus',
 ];
-const CONTENT_FIELDS = ['year', 'week', 'date', 'hacienda', 'suerte', 'labor', 'service', 'unit', 'units', 'tariff', 'total', 'contractorCode'];
+const CONTENT_FIELDS = [
+  'year',
+  'week',
+  'date',
+  'hacienda',
+  'suerte',
+  'labor',
+  'service',
+  'unit',
+  'units',
+  'tariff',
+  'total',
+  'contractorCode',
+];
 const BILLING_KEY_FIELDS = ['year', 'week', 'date', 'hacienda', 'suerte', 'labor', 'service', 'unit', 'pFact', 'contractorCode'];
 
 const signature = (fields) => (row) => JSON.stringify(fields.map((field) => row[field] ?? null));
@@ -47,9 +81,19 @@ export const classifyRepetitions = (prefactura) => {
   const byId = new Map();
   const groups = [];
   const mark = (row, kind) => byId.set(row.id, [...new Set([...(byId.get(row.id) ?? []), kind])]);
-  const summary = Object.fromEntries(Object.keys(REPETITION_KINDS).map((kind) => [kind, { groups: 0, rows: 0, extraRows: 0, extraAmount: 0, amount: 0 }]));
+  const summary = Object.fromEntries(
+    Object.keys(REPETITION_KINDS).map((kind) => [kind, { groups: 0, rows: 0, extraRows: 0, extraAmount: 0, amount: 0 }]),
+  );
   const register = (kind, rows, extra) => {
-    groups.push({ kind, rows, extraRows: extra.length, extraAmount: round(extra.reduce((total, row) => total + row.total, 0), 2) });
+    groups.push({
+      kind,
+      rows,
+      extraRows: extra.length,
+      extraAmount: round(
+        extra.reduce((total, row) => total + row.total, 0),
+        2,
+      ),
+    });
     const entry = summary[kind];
     entry.groups += 1;
     entry.rows += rows.length;
@@ -74,7 +118,9 @@ export const classifyRepetitions = (prefactura) => {
     if (new Set(rows.map((row) => row.total)).size < 2 && new Set(rows.map((row) => row.tariff)).size < 2) continue;
     const byUnits = new Map();
     rows.forEach((row) => byUnits.set(row.units, [...(byUnits.get(row.units) ?? []), row]));
-    const sameQuantity = [...byUnits.values()].filter((list) => list.length > 1 && new Set(list.map((row) => row.tariff)).size > 1);
+    const sameQuantity = [...byUnits.values()].filter(
+      (list) => list.length > 1 && new Set(list.map((row) => row.tariff)).size > 1,
+    );
     if (sameQuantity.length) sameQuantity.forEach((list) => register('MISMA_CANTIDAD_TARIFA_DISTINTA', list, []));
     else register('VARIAS_LINEAS_MISMA_CLAVE', rows, []);
   }

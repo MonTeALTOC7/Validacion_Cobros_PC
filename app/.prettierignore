@@ -1,2 +1,4 @@
 tests/legacy/
 dist/
+# Hoja de estilos v0.7 extraída tal cual del bundle publicado (se conserva sin reformatear para trazabilidad).
+src/styles.css

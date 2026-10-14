@@ -91,13 +91,17 @@ export const assessDataQuality = (inputs, options = {}) => {
         const official = calendar.get(periodKey(row.year, row.week));
         if (official) {
           if (row.date < official.start || row.date > official.end) {
-            outside.push(example(source, row, `Fecha ${row.date} fuera de la semana oficial ${official.start} → ${official.end}`));
+            outside.push(
+              example(source, row, `Fecha ${row.date} fuera de la semana oficial ${official.start} → ${official.end}`),
+            );
           }
           return;
         }
         const inferred = inferredRange(row);
         if (inferred && (row.date < inferred.start || row.date > inferred.end)) {
-          outsideInferred.push(example(source, row, `Fecha ${row.date} fuera del rango inferido ${inferred.start} → ${inferred.end}`));
+          outsideInferred.push(
+            example(source, row, `Fecha ${row.date} fuera del rango inferido ${inferred.start} → ${inferred.end}`),
+          );
         }
       });
     }
@@ -147,7 +151,8 @@ export const assessDataQuality = (inputs, options = {}) => {
       'MISMA_CANTIDAD_TARIFA_DISTINTA',
       'info',
       (s) => `Prefactura: ${s.groups} grupo(s) con la misma cantidad y tarifas distintas`,
-      () => 'Misma clave de cobro (fecha, lote, labor, servicio, P.FACT) y misma cantidad con tarifas distintas. Puede ser legítimo (tarifa normal y doble); revisar.',
+      () =>
+        'Misma clave de cobro (fecha, lote, labor, servicio, P.FACT) y misma cantidad con tarifas distintas. Puede ser legítimo (tarifa normal y doble); revisar.',
     ],
     [
       'VARIAS_LINEAS_MISMA_CLAVE',
@@ -166,7 +171,13 @@ export const assessDataQuality = (inputs, options = {}) => {
         severity,
         title(summary),
         detail(summary),
-        rows.map((row) => example('Prefactura', row, `P.FACT ${row.pFact} · ${row.service} · ${num(row.units)} ${row.unit} × ${num(row.tariff)} = ${num(row.total)}`)),
+        rows.map((row) =>
+          example(
+            'Prefactura',
+            row,
+            `P.FACT ${row.pFact} · ${row.service} · ${num(row.units)} ${row.unit} × ${num(row.tariff)} = ${num(row.total)}`,
+          ),
+        ),
       ),
       count: kind === 'DUPLICADO_EXACTO' || kind === 'COBRO_EN_OTRA_PREFACTURA' ? summary.extraRows : summary.groups,
       amount: summary.extraAmount,
@@ -197,7 +208,11 @@ export const assessDataQuality = (inputs, options = {}) => {
         'Prefactura: Total distinto de Tarifa × Unidades',
         'Diferencia mayor a C$ 0.02 entre el total informado y la multiplicación.',
         badTotals.map((row) =>
-          example('Prefactura', row, `${num(row.units)} × ${num(row.tariff)} = ${round(row.units * row.tariff, 2)} ≠ ${num(row.total)}`),
+          example(
+            'Prefactura',
+            row,
+            `${num(row.units)} × ${num(row.tariff)} = ${round(row.units * row.tariff, 2)} ≠ ${num(row.total)}`,
+          ),
         ),
       ),
     );
@@ -215,7 +230,11 @@ export const assessDataQuality = (inputs, options = {}) => {
         `Tarifas que representan menos del ${options.atypicalTariffPct ?? 5} % de las filas de su servicio y UM. Indicador para revisar; no implica error.`,
         atypical.map((row) => {
           const usual = profile.get(`${row.service}|${row.unit}`)?.mostFrequent;
-          return example('Prefactura', row, `${row.service} ${row.unit}: tarifa ${num(row.tariff)} (más frecuente ${num(usual)})`);
+          return example(
+            'Prefactura',
+            row,
+            `${row.service} ${row.unit}: tarifa ${num(row.tariff)} (más frecuente ${num(usual)})`,
+          );
         }),
       ),
     );

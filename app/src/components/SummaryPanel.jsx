@@ -112,8 +112,8 @@ export function SummaryPanel({ analysis, inputs, quality = [], multiYear, onNavi
     (f) => !isBlockingPending(f) && f.type !== 'EXCLUDED' && (f.severity === 'warning' || f.status === 'COBRO_EXCESO'),
   );
   const excess = payrollCases.filter((f) => f.status === 'COBRO_EXCESO' && collectionState(f) === 'COBRADO');
-  const duplicates = scoped.filter(
-    (f) => ['DUPLICADO_POTENCIAL', 'REPETICION_RESPALDADA', 'COBRO_EN_OTRA_PREFACTURA'].some((flag) => (f.flags ?? []).includes(flag)),
+  const duplicates = scoped.filter((f) =>
+    ['DUPLICADO_POTENCIAL', 'REPETICION_RESPALDADA', 'COBRO_EN_OTRA_PREFACTURA'].some((flag) => (f.flags ?? []).includes(flag)),
   );
   const pendingUnits = unitTotalsByState(payrollCases, 'pending');
   const excessUnits = unitTotalsByState(payrollCases, 'excess');
@@ -315,7 +315,8 @@ export function SummaryPanel({ analysis, inputs, quality = [], multiYear, onNavi
           <TriangleAlert size={18} />
           <span>
             <strong>Posibles duplicados en Prefactura (incluidos en el total, sin descontar):</strong>{' '}
-            {analysis.duplicateExtraRows ?? analysis.duplicateGroups} copia(s) exacta(s) por {formatCurrency(analysis.duplicateExtraAmount ?? 0)}
+            {analysis.duplicateExtraRows ?? analysis.duplicateGroups} copia(s) exacta(s) por{' '}
+            {formatCurrency(analysis.duplicateExtraAmount ?? 0)}
             {analysis.repetitions?.COBRO_EN_OTRA_PREFACTURA?.extraRows > 0 &&
               ` · ${analysis.repetitions.COBRO_EN_OTRA_PREFACTURA.extraRows} cobro(s) repetido(s) en otra prefactura por ${formatCurrency(analysis.repetitions.COBRO_EN_OTRA_PREFACTURA.extraAmount)}`}
             . {duplicates.length} caso(s) conciliable(s) afectados en esta vista. No se eliminan: revise si son doble registro.
@@ -403,8 +404,8 @@ export function SummaryPanel({ analysis, inputs, quality = [], multiYear, onNavi
               <div>
                 <h2>Pendientes por semana y cobertura de Prefactura</h2>
                 <p>
-                  Última semana con Prefactura: {periodLongText(breakdown.lastBilledPeriod, true)}. Los pendientes de semanas posteriores
-                  no son necesariamente faltas de cobro: el reporte todavía no las cubre.
+                  Última semana con Prefactura: {periodLongText(breakdown.lastBilledPeriod, true)}. Los pendientes de semanas
+                  posteriores no son necesariamente faltas de cobro: el reporte todavía no las cubre.
                 </p>
               </div>
             </div>

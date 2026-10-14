@@ -416,7 +416,16 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
           className="exec-reset"
           disabled={!activeFilters}
           onClick={() =>
-            setFilters({ from: '', to: '', producer: 'all', hacienda: 'all', financeClass: 'all', contractor: 'all', universe: 'all', search: '' })
+            setFilters({
+              from: '',
+              to: '',
+              producer: 'all',
+              hacienda: 'all',
+              financeClass: 'all',
+              contractor: 'all',
+              universe: 'all',
+              search: '',
+            })
           }
         >
           Restablecer {activeFilters ? `(${activeFilters})` : ''}
@@ -477,8 +486,8 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
             <h3>Universos del total</h3>
             <p>
               El total suma montos que la conciliación trata por separado. El ámbito de conciliación (
-              {SCOPE_LABELS[parameters.scope] ?? parameters.scope}) solo filtra la Nómina; la Prefactura se incluye completa porque
-              toda corresponde a productores. Compare con la conciliación solo el universo “Conciliable contra Nómina”.
+              {SCOPE_LABELS[parameters.scope] ?? parameters.scope}) solo filtra la Nómina; la Prefactura se incluye completa
+              porque toda corresponde a productores. Compare con la conciliación solo el universo “Conciliable contra Nómina”.
             </p>
           </div>
         </div>
@@ -589,8 +598,8 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
                   <h3>Nómina pendiente de prefacturar por productor</h3>
                   <p>
                     Casos de la conciliación sin cobro o con cobro parcial (todo el período conciliado, ámbito{' '}
-                    {SCOPE_LABELS[parameters.scope] ?? parameters.scope}; no cambia con los filtros de esta página). Se expresan en
-                    unidades; no se valorizan porque la tarifa de un mismo servicio varía.
+                    {SCOPE_LABELS[parameters.scope] ?? parameters.scope}; no cambia con los filtros de esta página). Se expresan
+                    en unidades; no se valorizan porque la tarifa de un mismo servicio varía.
                   </p>
                 </div>
               </div>
@@ -705,7 +714,10 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
           <div className="panel-head">
             <div>
               <h3>Facturación por suerte</h3>
-              <p>Área física de la suerte (Maestro; si falta, la informada en Prefactura). HA trabajadas = unidades con UM HA. “Prefact. C$/ha” es el monto de Prefactura por hectárea física, no el costo total de producción.</p>
+              <p>
+                Área física de la suerte (Maestro; si falta, la informada en Prefactura). HA trabajadas = unidades con UM HA.
+                “Prefact. C$/ha” es el monto de Prefactura por hectárea física, no el costo total de producción.
+              </p>
             </div>
           </div>
           <DataTable

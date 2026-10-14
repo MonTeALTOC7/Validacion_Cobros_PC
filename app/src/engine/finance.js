@@ -48,7 +48,8 @@ export const financeUniverse = (financeClassKey) =>
  * Clave de prefactura. En los datos verificados (oct 2026) cada P.FACT pertenece a un solo productor, año y finca,
  * pero no hay garantía de que SIAGRI no reutilice la numeración: se usa año operativo + productor + P.FACT.
  */
-export const invoiceKey = (row) => [row.year ?? '', row.producerCode || row.producerName || '', row.pFact || '(sin P.FACT)'].join('|');
+export const invoiceKey = (row) =>
+  [row.year ?? '', row.producerCode || row.producerName || '', row.pFact || '(sin P.FACT)'].join('|');
 
 /** Clase financiera de una fila de Prefactura (mismas reglas que la conciliación). */
 export const financeClass = (row) => {

@@ -116,7 +116,8 @@ export const pendingBreakdown = (analysis) => {
     if (collectionState(finding) === 'PARCIAL') entry.partial += 1;
     else entry.unpaid += 1;
     entry.byStatus[finding.status] = (entry.byStatus[finding.status] ?? 0) + 1;
-    const units = collectionState(finding) === 'PARCIAL' ? Math.max(0, finding.payrollUnits - finding.billedUnits) : finding.payrollUnits;
+    const units =
+      collectionState(finding) === 'PARCIAL' ? Math.max(0, finding.payrollUnits - finding.billedUnits) : finding.payrollUnits;
     entry.byUnit[finding.unit] = Math.round(((entry.byUnit[finding.unit] ?? 0) + units) * 100) / 100;
     byPeriod.set(period, entry);
   }

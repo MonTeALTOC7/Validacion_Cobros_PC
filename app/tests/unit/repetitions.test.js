@@ -21,14 +21,19 @@ describe('repeticiones de Prefactura', () => {
   });
 
   it('misma clave con cantidades distintas: varias líneas, solo informativo', async () => {
-    const result = classifyRepetitions(await billed([prefacturaRow(), prefacturaRow({ Unidades: 1, Tarifa: 683.11, Total: 683.11 })]));
+    const result = classifyRepetitions(
+      await billed([prefacturaRow(), prefacturaRow({ Unidades: 1, Tarifa: 683.11, Total: 683.11 })]),
+    );
     expect(result.summary.VARIAS_LINEAS_MISMA_CLAVE.groups).toBe(1);
     expect(result.summary.MISMA_CANTIDAD_TARIFA_DISTINTA.groups).toBe(0);
   });
 
   it('mismo cobro en otra prefactura', async () => {
     const result = classifyRepetitions(
-      await billed([prefacturaRow(), prefacturaRow({ 'P.FACT': '15900', 'Nombre Productor': 'PRODUCTOR PRUEBA   FACTURA :15900' })]),
+      await billed([
+        prefacturaRow(),
+        prefacturaRow({ 'P.FACT': '15900', 'Nombre Productor': 'PRODUCTOR PRUEBA   FACTURA :15900' }),
+      ]),
     );
     expect(result.summary.COBRO_EN_OTRA_PREFACTURA).toMatchObject({ groups: 1, extraRows: 1, extraAmount: 694.04 });
     expect(result.summary.DUPLICADO_EXACTO.groups).toBe(0);

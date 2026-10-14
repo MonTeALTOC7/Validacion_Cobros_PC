@@ -70,7 +70,12 @@ describe('módulo financiero', () => {
   it('P.FACT con el mismo número en otro productor o año no se fusiona', async () => {
     const inputs = await load([
       prefacturaRow(),
-      prefacturaRow({ Productor: 'CL2000', 'Nombre Productor': 'OTRO PRODUCTOR   FACTURA :15837', Hda: '300', 'Nombre Hacienda': 'OTRA FINCA' }),
+      prefacturaRow({
+        Productor: 'CL2000',
+        'Nombre Productor': 'OTRO PRODUCTOR   FACTURA :15837',
+        Hda: '300',
+        'Nombre Hacienda': 'OTRA FINCA',
+      }),
       prefacturaRow({ Fecha: day('2027-03-01'), Periodo: '' }),
     ]);
     const rows = buildFinanceRows(inputs, '2026-01-01');
