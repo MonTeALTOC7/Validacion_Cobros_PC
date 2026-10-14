@@ -58,7 +58,9 @@ const metrics = (rows) => {
     producers: new Set(rows.map((row) => row.producer)).size,
     producerNames: [...new Set(rows.map((row) => row.producer))].sort(),
     byLaborUnit: sum((row) => `${row.classification === 'Mecanizada' ? 'MEC' : 'MAN'}|${row.labor}|${row.unit}`),
-    byWeekUnit: sum((row) => `${row.year ?? '¿?'}-S${String(row.week).padStart(2, '0')}|${row.unit}`),
+    // El payload legacy no trae `year`: la semana se compara sin año y el año se cuenta aparte.
+    byWeekUnit: sum((row) => `S${String(row.week).padStart(2, '0')}|${row.unit}`),
+    byYear: count((row) => row.year ?? 'sin año'),
     byFincaUnit: sum((row) => `${row.hacienda}|${row.unit}`),
     bySuerteUnit: sum((row) => `${row.hacienda}·${row.suerte}|${row.unit}`),
     byClassification: count((row) => row.classification),
@@ -73,7 +75,7 @@ const diffMaps = (a, b) => {
 };
 const compare = (label, a, b) => {
   const out = {};
-  for (const dim of ['byLaborUnit', 'byWeekUnit', 'byFincaUnit', 'bySuerteUnit', 'byClassification', 'bySource'])
+  for (const dim of ['byYear', 'byLaborUnit', 'byWeekUnit', 'byFincaUnit', 'bySuerteUnit', 'byClassification', 'bySource'])
     out[dim] = diffMaps(a[dim], b[dim]);
   out.rows = [a.rows, b.rows];
   out.producers = [a.producers, b.producers];
@@ -122,23 +124,46 @@ const scrapeFiltered = async (page, producer, from, to) => {
   return hero;
 };
 
-const exportCsv = async (page) => {
-  await page.locator('.exec-switch button', { hasText: 'Manuales' }).click();
+/** Separa una línea CSV con ";" respetando comillas. */
+const splitCsv = (line) => {
+  const cells = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (quoted && char === '"' && line[i + 1] === '"') {
+      cell += '"';
+      i += 1;
+    } else if (char === '"') quoted = !quoted;
+    else if (char === ';' && !quoted) {
+      cells.push(cell);
+      cell = '';
+    } else cell += char;
+  }
+  cells.push(cell);
+  return cells;
+};
+
+const exportCsv = async (page, workType = 'Manuales') => {
+  await page.locator('.exec-switch button', { hasText: workType }).click();
   await page.locator('.exec-local-nav button', { hasText: 'Detalle por labor' }).click();
   await page.waitForTimeout(300);
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.locator('button', { hasText: 'Exportar detalle' }).click(),
   ]);
-  const text = (await readFile(await download.path(), 'utf8')).replace(/^﻿/, '');
+  const text = (await readFile(await download.path(), 'utf8')).replace(/^\uFEFF/, '');
   const lines = text.split(/\r\n/).filter(Boolean);
-  const header = lines[0].split(';').map((cell) => cell.replace(/^"|"$/g, ''));
+  const header = splitCsv(lines[0]);
+  const records = lines.slice(1).map(splitCsv);
   const quantityIndex = header.indexOf('Cantidad');
-  const quantity = lines
-    .slice(1)
-    .reduce((total, line) => total + Number(line.split(';')[quantityIndex].replace(/^"|"$/g, '')), 0);
-  return { header, rows: lines.length - 1, quantity: round(quantity) };
+  const quantity = records.reduce((total, cells) => total + Number(cells[quantityIndex]), 0);
+  return { header, records, rows: records.length, quantity: round(quantity) };
 };
+
+/** Filas del CSV proyectadas a unas columnas (semana, fecha, finca, suerte, labor, UM, cantidad…), ordenadas. */
+const projectCsv = (csv, columns) =>
+  csv.records.map((cells) => columns.map((column) => cells[csv.header.indexOf(column)]).join('|')).sort();
 
 /** Publicación interceptada: devuelve el payload que la app enviaría a GitHub. */
 const capturePublish = async (page) => {
@@ -266,19 +291,44 @@ try {
     filteredMaestra === filteredStandalone,
     filteredMaestra.slice(0, 100),
   );
-  // Exportador
-  const csvMaestra = await exportCsv(page);
-  const csvStandalone = await exportCsv(standalone.page);
-  check(
-    'Exportador: mismas filas y cantidad total',
-    csvMaestra.rows === csvStandalone.rows && csvMaestra.quantity === csvStandalone.quantity,
-    `${csvMaestra.rows} filas · ${csvMaestra.quantity}`,
-  );
-  check(
-    'Exportador: columnas de la App Maestra contenidas en el nuevo',
-    csvMaestra.header.every((column) => csvStandalone.header.includes(column)),
-    `nuevas: ${csvStandalone.header.filter((c) => !csvMaestra.header.includes(c)).join(', ')}`,
-  );
+  // Exportador: fila por fila (semana, fecha, finca, suerte, labor, UM, cantidad…) en las columnas de la App Maestra
+  for (const workType of ['Manuales', 'Mecanizadas']) {
+    const csvMaestra = await exportCsv(page, workType);
+    const csvStandalone = await exportCsv(standalone.page, workType);
+    check(
+      `Exportador ${workType}: mismas filas y cantidad total`,
+      csvMaestra.rows === csvStandalone.rows && csvMaestra.quantity === csvStandalone.quantity,
+      `${csvMaestra.rows} filas · ${csvMaestra.quantity}`,
+    );
+    check(
+      `Exportador ${workType}: columnas de la App Maestra contenidas en el nuevo`,
+      csvMaestra.header.every((column) => csvStandalone.header.includes(column)),
+      `nuevas: ${csvStandalone.header.filter((c) => !csvMaestra.header.includes(c)).join(', ')}`,
+    );
+    // Todas las columnas del CSV de la App Maestra. "Nota de edad" y "Fila" dependen de ageNote/sourceRow, que el
+    // payload publica desde v0.8 (antes la App Maestra escribía la nota vacía y "REPORTE!undefined").
+    const shared = csvMaestra.header;
+    check(
+      `Exportador ${workType}: mismo contenido fila por fila (${shared.length} columnas de la App Maestra)`,
+      JSON.stringify(projectCsv(csvMaestra, shared)) === JSON.stringify(projectCsv(csvStandalone, shared)),
+      shared.join(', '),
+    );
+    const rowsOf = (csv) => [...new Set(projectCsv(csv, ['Fila']).map((value) => value.replace(/\d+$/, 'n')))];
+    info(
+      `Exportador ${workType} · Fila`,
+      `App Maestra ${rowsOf(csvMaestra).join(', ')} · independiente ${rowsOf(csvStandalone).join(', ')}`,
+    );
+    report[`csvColumnasDistintas${workType}`] = csvMaestra.header
+      .filter(
+        (column) => JSON.stringify(projectCsv(csvMaestra, [column])) !== JSON.stringify(projectCsv(csvStandalone, [column])),
+      )
+      .map((column) => {
+        const a = projectCsv(csvMaestra, [column]);
+        const b = projectCsv(csvStandalone, [column]);
+        const index = a.findIndex((value, i) => value !== b[i]);
+        return { column, maestra: a.slice(index, index + 3), independiente: b.slice(index, index + 3) };
+      });
+  }
   // Recarga
   await page.reload();
   await page.waitForSelector('.exec-reference-hero', { timeout: 120000 });

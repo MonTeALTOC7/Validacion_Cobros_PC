@@ -164,13 +164,14 @@ export function TrackingPanel({ inputs, startDate, onAudit }) {
         'Tarifa',
         'Total',
         'P.FACT',
+        'Período',
       ],
       ...rankingSource.map((U) => [
         U.producer,
         U.hacienda,
         U.suerte,
         U.date,
-        periodOfRow(U),
+        U.week,
         U.labor,
         U.name,
         U.unit,
@@ -183,6 +184,7 @@ export function TrackingPanel({ inputs, startDate, onAudit }) {
         U.source === 'Prefactura' ? U.tariff : '',
         U.source === 'Prefactura' ? U.amount : '',
         U.pFact ?? '',
+        periodOfRow(U),
       ]),
     ];
     downloadBlob(

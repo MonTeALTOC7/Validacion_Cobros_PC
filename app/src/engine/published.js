@@ -1,6 +1,6 @@
 // Dataset público de Seguimiento que se publica para la App Maestra (modules/labores/data/seguimiento.json).
 // Sanitizado: sin tarifas, montos ni P.FACT. Conserva exactamente los campos que lee el bundle de la App Maestra
-// (8b2-1-public) y agrega `year` y `maxPeriod`, que ese bundle ignora.
+// (8b2-1-public), agrega `ageNote` y `sourceRow` (que ese bundle lee en su CSV) y `year` y `maxPeriod`, que ignora.
 import { buildTrackingRows } from './tracking';
 import { comparePeriods } from './periods';
 
@@ -22,6 +22,10 @@ export const PUBLISHED_FIELDS = [
   'scope',
   'ageDays',
   'ageBase',
+  // Leídos por el exportador CSV de la App Maestra ("Nota de edad", "Fila"); hasta v0.8 no se publicaban y su CSV
+  // mostraba la nota vacía y "REPORTE!undefined".
+  'ageNote',
+  'sourceRow',
 ];
 
 export const buildPublishedTracking = (inputs, startDate, generatedAt = new Date().toISOString()) => {
