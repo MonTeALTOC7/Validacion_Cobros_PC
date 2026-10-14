@@ -32,10 +32,13 @@ import {
   resolveStartPeriod,
 } from './periods';
 import { buildTariffProfile, distinctTariffs, isAtypicalTariff } from './tariffs';
+import { classifyRepetitions, exactExtraCopies } from './repetitions';
 
 export const FLAG_LABELS = {
   DUPLICADO_POTENCIAL: 'Duplicado potencial',
   REPETICION_RESPALDADA: 'Repetición respaldada',
+  COBRO_EN_OTRA_PREFACTURA: 'Mismo cobro en otra prefactura',
+  MISMA_CANTIDAD_TARIFA_DISTINTA: 'Misma cantidad, tarifas distintas',
   LOTE_NO_ENCONTRADO: 'Lote no encontrado',
   TARIFA_POCO_FRECUENTE: 'Tarifa poco frecuente',
   FECHA_FUERA_DE_SEMANA: 'Fecha fuera de su semana',
@@ -81,49 +84,21 @@ export const directStatus = (payrollUnits, billedUnits, tolerance) => {
 };
 
 // ---------------------------------------------------------------------------------------------
-// Duplicados exactos de Prefactura
+// Repeticiones de Prefactura (ver repetitions.js)
 
-const DUPLICATE_FIELDS = [
-  'year',
-  'week',
-  'date',
-  'hacienda',
-  'suerte',
-  'labor',
-  'service',
-  'units',
-  'unit',
-  'tariff',
-  'pFact',
-  'contractorCode',
-];
-const duplicateSignature = (row) => DUPLICATE_FIELDS.map((field) => row[field]).join('|');
-
-/** Filas idénticas de Prefactura: id → tamaño del grupo, más totales de copias extra. */
+/** Compatibilidad con v0.8 inicial: resumen de duplicados exactos (id → tamaño de grupo y copias extra). */
 export const findDuplicateRows = (prefactura) => {
-  const groups = groupBy(prefactura, duplicateSignature);
+  const repetitions = classifyRepetitions(prefactura);
+  const exact = repetitions.groups.filter((group) => group.kind === 'DUPLICADO_EXACTO');
   const groupSizeById = new Map();
-  let groupsCount = 0;
-  let extraRows = 0;
-  let extraAmount = 0;
-  for (const rows of groups.values()) {
-    if (rows.length < 2) continue;
-    groupsCount += 1;
-    extraRows += rows.length - 1;
-    extraAmount += sumBy(rows.slice(1), (row) => row.total);
-    rows.forEach((row) => groupSizeById.set(row.id, rows.length));
-  }
-  return { groupSizeById, groupsCount, extraRows, extraAmount: round(extraAmount, 2) };
-};
-
-/** Copias extra contenidas en un conjunto de filas (por grupo idéntico). */
-const extraCopiesIn = (rows) => {
-  const groups = groupBy(rows, duplicateSignature);
-  let extra = 0;
-  groups.forEach((list) => {
-    extra += list.length - 1;
-  });
-  return extra;
+  exact.forEach((group) => group.rows.forEach((row) => groupSizeById.set(row.id, group.rows.length)));
+  return {
+    groupSizeById,
+    groupsCount: exact.length,
+    extraRows: repetitions.summary.DUPLICADO_EXACTO.extraRows,
+    extraAmount: repetitions.summary.DUPLICADO_EXACTO.extraAmount,
+    repetitions,
+  };
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -153,7 +128,10 @@ const createContext = (inputs, parameters, prefactura, payroll) => {
 /** Campos comunes añadidos a cada hallazgo (al final, para conservar el orden de los campos v0.7). */
 const traceFields = (sample, payrollRows, billedRows, context) => {
   const flags = [];
-  const duplicateRows = extraCopiesIn(billedRows.filter((row) => context.duplicates.groupSizeById.has(row.id)));
+  const duplicateRows = exactExtraCopies(billedRows, context.duplicates.repetitions);
+  const kinds = new Set(billedRows.flatMap((row) => context.duplicates.repetitions.byId.get(row.id) ?? []));
+  if (kinds.has('COBRO_EN_OTRA_PREFACTURA')) flags.push('COBRO_EN_OTRA_PREFACTURA');
+  if (kinds.has('MISMA_CANTIDAD_TARIFA_DISTINTA')) flags.push('MISMA_CANTIDAD_TARIFA_DISTINTA');
   if (billedRows.some((row) => isAtypicalTariff(context.tariffProfile, row))) flags.push('TARIFA_POCO_FRECUENTE');
   if ([...payrollRows, ...billedRows].some(context.outsideWeek)) flags.push('FECHA_FUERA_DE_SEMANA');
   return {
@@ -181,6 +159,14 @@ const applyMasterAndDuplicateFlags = (finding, masterStatus, parameters) => {
       status === 'CONCILIADO'
         ? ` Prefactura incluye ${finding.duplicateRows} fila(s) idéntica(s), pero la Nómina respalda la misma cantidad.`
         : ` Prefactura incluye ${finding.duplicateRows} fila(s) idéntica(s) (mismo P.FACT, fecha, unidades y tarifa): posible doble registro.`;
+  }
+  if (flags.includes('COBRO_EN_OTRA_PREFACTURA')) {
+    explanation +=
+      ' Una fila de Prefactura tiene un cobro idéntico (fecha, lote, servicio, cantidad, tarifa y total) en otro P.FACT: verifique si se facturó dos veces.';
+  }
+  if (flags.includes('MISMA_CANTIDAD_TARIFA_DISTINTA')) {
+    explanation +=
+      ' En el mismo P.FACT hay líneas con la misma cantidad y tarifas distintas: verifique si corresponden a tarifas distintas legítimas (p. ej. normal y doble) o a un doble cobro.';
   }
   return { ...finding, status, severity, explanation, flags: [...new Set(flags)] };
 };
@@ -662,6 +648,7 @@ export const runReconciliation = (inputs, parameters) => {
     duplicateGroups: context.duplicates.groupsCount,
     duplicateExtraRows: context.duplicates.extraRows,
     duplicateExtraAmount: context.duplicates.extraAmount,
+    repetitions: context.duplicates.repetitions.summary,
     coverage: {
       payrollRows: payroll.length,
       prefacturaRows: prefactura.length,

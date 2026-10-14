@@ -25,6 +25,31 @@ export const FINANCE_CLASSES = {
 
 export const FINANCE_CLASS_ORDER = Object.keys(FINANCE_CLASSES);
 
+/**
+ * Universo de cada monto respecto a la conciliación con Nómina. El total facturado los suma todos; se
+ * muestran por separado para no comparar cifras de universos distintos.
+ * - CONCILIABLE: CS9999 manual y paquetes TPS (se concilian contra Nómina).
+ * - MECANIZADA_CASUR: CS9999 mecanizada o sin regla (sin base en Nómina).
+ * - FUERA_CONCILIACION: CS2661, TPS externo, aplicación aérea y otros contratistas (excluidos de la conciliación).
+ */
+export const FINANCE_UNIVERSES = {
+  CONCILIABLE: 'Conciliable contra Nómina',
+  MECANIZADA_CASUR: 'Mecanizada CASUR (sin base en Nómina)',
+  FUERA_CONCILIACION: 'Fuera de la conciliación',
+};
+export const financeUniverse = (financeClassKey) =>
+  financeClassKey === 'MANUAL' || financeClassKey === 'TPS'
+    ? 'CONCILIABLE'
+    : financeClassKey === 'MECANIZADA' || financeClassKey === 'SIN_CLASIFICAR'
+      ? 'MECANIZADA_CASUR'
+      : 'FUERA_CONCILIACION';
+
+/**
+ * Clave de prefactura. En los datos verificados (oct 2026) cada P.FACT pertenece a un solo productor, año y finca,
+ * pero no hay garantía de que SIAGRI no reutilice la numeración: se usa año operativo + productor + P.FACT.
+ */
+export const invoiceKey = (row) => [row.year ?? '', row.producerCode || row.producerName || '', row.pFact || '(sin P.FACT)'].join('|');
+
 /** Clase financiera de una fila de Prefactura (mismas reglas que la conciliación). */
 export const financeClass = (row) => {
   if (row.labor === 'AAM' || row.contractorCode === 'CS3317') return 'AEREA';
@@ -92,6 +117,8 @@ export const buildFinanceRows = (inputs, startDate) => {
       invoice: row.invoice ?? '',
       contractorCode: row.contractorCode,
       financeClass: financeClass(row),
+      universe: financeUniverse(financeClass(row)),
+      invoiceKey: invoiceKey(row),
     };
   });
 };
@@ -163,7 +190,7 @@ export const aggregateFinance = (rows, keyOf, labelOf = keyOf) => {
     }
     group.total += row.total;
     group.rows += 1;
-    if (row.pFact) group.invoices.add(row.pFact);
+    if (row.pFact) group.invoices.add(row.invoiceKey);
     group.producers.add(row.producerName);
     group.haciendas.add(row.hacienda);
     if (!group.lots.has(row.lot)) group.lots.set(row.lot, row.lotArea);
@@ -193,6 +220,7 @@ export const FINANCE_DIMENSIONS = {
     keyOf: (row) => `${row.service}|${row.unit}`,
     labelOf: (row) => `${row.service} · ${row.serviceName} (${row.unit})`,
   },
+  universe: { label: 'Universo', keyOf: (row) => row.universe, labelOf: (row) => FINANCE_UNIVERSES[row.universe] },
   financeClass: { label: 'Tipo de labor', keyOf: (row) => row.financeClass, labelOf: (row) => FINANCE_CLASSES[row.financeClass] },
   contractor: {
     label: 'Contratista',
@@ -202,7 +230,7 @@ export const FINANCE_DIMENSIONS = {
   period: { label: 'Semana', keyOf: (row) => row.period, labelOf: (row) => row.period },
   invoice: {
     label: 'Prefactura (P.FACT)',
-    keyOf: (row) => row.pFact || '(sin P.FACT)',
+    keyOf: (row) => row.invoiceKey,
     labelOf: (row) => row.pFact || '(sin P.FACT)',
   },
 };
@@ -221,6 +249,7 @@ export const financeSummary = (rows) => {
   const byClass = aggregateFinance(rows, FINANCE_DIMENSIONS.financeClass.keyOf, FINANCE_DIMENSIONS.financeClass.labelOf);
   const byProducer = aggregateFinance(rows, FINANCE_DIMENSIONS.producer.keyOf, FINANCE_DIMENSIONS.producer.labelOf);
   const byLabor = aggregateFinance(rows, FINANCE_DIMENSIONS.labor.keyOf, FINANCE_DIMENSIONS.labor.labelOf);
+  const byUniverse = aggregateFinance(rows, FINANCE_DIMENSIONS.universe.keyOf, FINANCE_DIMENSIONS.universe.labelOf);
   const byContractor = aggregateFinance(rows, FINANCE_DIMENSIONS.contractor.keyOf, FINANCE_DIMENSIONS.contractor.labelOf);
   const last = byPeriod.at(-1);
   const previous = byPeriod.at(-2);
@@ -232,6 +261,7 @@ export const financeSummary = (rows) => {
     byProducer,
     byLabor,
     byContractor,
+    byUniverse,
     lastPeriod: last ?? null,
     previousPeriod: previous ?? null,
     lastFourAverage: recent.length ? round(recent.reduce((total, group) => total + group.total, 0) / recent.length, 2) : 0,
@@ -243,13 +273,20 @@ export const financeSummary = (rows) => {
 };
 
 /** Resumen por prefactura (P.FACT): productor, finca, fechas, períodos y líneas. */
-export const invoiceSummaries = (rows) =>
-  [...groupBy(rows, (row) => row.pFact || '(sin P.FACT)')]
-    .map(([pFact, list]) => {
+export const invoiceSummaries = (rows) => {
+  const keysByNumber = new Map();
+  rows.forEach((row) => keysByNumber.set(row.pFact, new Set([...(keysByNumber.get(row.pFact) ?? []), row.invoiceKey])));
+  return [...groupBy(rows, (row) => row.invoiceKey)]
+    .map(([key, list]) => {
+      const pFact = list[0].pFact || '(sin P.FACT)';
       const dates = list.map((row) => row.date).sort();
       const periods = [...new Set(list.map((row) => row.period))].sort(comparePeriods);
       return {
+        key,
         pFact,
+        year: list[0].year,
+        // El mismo número aparece con otro productor o año operativo: se muestran por separado.
+        reusedNumber: (keysByNumber.get(list[0].pFact)?.size ?? 1) > 1,
         producerName: [...new Set(list.map((row) => row.producerName))].join(' / '),
         producerCode: [...new Set(list.map((row) => row.producerCode))].join(' / '),
         haciendas: [...new Set(list.map((row) => row.hacienda))].join(' / '),
@@ -266,6 +303,7 @@ export const invoiceSummaries = (rows) =>
       };
     })
     .sort((a, b) => String(b.lastDate).localeCompare(String(a.lastDate)) || b.pFact.localeCompare(a.pFact));
+};
 
 /**
  * Pendientes de cobro por productor (unidades, por UM), a partir de la conciliación: se asigna a cada

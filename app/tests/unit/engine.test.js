@@ -149,6 +149,30 @@ describe('conciliación directa', () => {
     expect(direct(analysis)).toHaveLength(1);
   });
 
+  it('Seguimiento: una mecanizada de 2027 no se descarta por una Nómina de la misma semana en 2026', async () => {
+    const mec = { 'Servicio SAP': 'EBCM', Labor: 'MEC', Unidades: 4, Total: 400, Tarifa: 100 };
+    const inputs = await load({
+      payroll: [payrollRow({ Labor: 'MEC', Servicio: 'EBCM', Fecha: day('2026-03-02') })],
+      prefactura: [
+        prefacturaRow({ ...mec, Fecha: day('2026-03-02') }),
+        prefacturaRow({ ...mec, Fecha: day('2027-03-01'), Periodo: '' }),
+      ],
+    });
+    const rows = buildTrackingRows(inputs, '2026-01-01');
+    const mechanized = rows.filter((row) => row.source === 'Prefactura');
+    // La de 2026 coincide con la Nómina (no se duplica); la de 2027 se conserva.
+    expect(mechanized.map((row) => row.period)).toEqual(['2027-S10']);
+    expect(rows.filter((row) => row.source === 'Nómina').map((row) => row.period)).toEqual(['2026-S10']);
+  });
+
+  it('Seguimiento: misma semana en años distintos se mantiene separada en Nómina', async () => {
+    const inputs = await load({
+      payroll: [payrollRow({ Fecha: day('2026-03-02') }), payrollRow({ Fecha: day('2027-03-01') })],
+    });
+    const rows = buildTrackingRows(inputs, '2026-01-01');
+    expect(rows.map((row) => row.period).sort()).toEqual(['2026-S10', '2027-S10']);
+  });
+
   it('más de una labor en la misma suerte y semana se concilia por separado', async () => {
     const analysis = await run({
       payroll: [payrollRow(), payrollRow({ Labor: 'CQM', Servicio: '32019', Unidades: 1 })],

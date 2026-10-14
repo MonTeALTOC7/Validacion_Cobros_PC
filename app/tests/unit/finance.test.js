@@ -67,6 +67,31 @@ describe('módulo financiero', () => {
     expect(invoiceSummaries(buildFinanceRows(inputs, '2026-01-01')).map((invoice) => invoice.pFact)).toEqual(['15838', '15837']);
   });
 
+  it('P.FACT con el mismo número en otro productor o año no se fusiona', async () => {
+    const inputs = await load([
+      prefacturaRow(),
+      prefacturaRow({ Productor: 'CL2000', 'Nombre Productor': 'OTRO PRODUCTOR   FACTURA :15837', Hda: '300', 'Nombre Hacienda': 'OTRA FINCA' }),
+      prefacturaRow({ Fecha: day('2027-03-01'), Periodo: '' }),
+    ]);
+    const rows = buildFinanceRows(inputs, '2026-01-01');
+    const invoices = invoiceSummaries(rows);
+    expect(invoices).toHaveLength(3);
+    expect(invoices.every((invoice) => invoice.pFact === '15837' && invoice.reusedNumber)).toBe(true);
+    expect(financeSummary(rows).overall.invoices).toBe(3);
+  });
+
+  it('separa universos: conciliable, mecanizada CASUR y fuera de la conciliación', async () => {
+    const inputs = await load([
+      prefacturaRow(),
+      prefacturaRow({ 'Servicio SAP': 'EBCM', Labor: 'MEC', Total: 500, Tarifa: 250 }),
+      prefacturaRow({ Contratista: 'CS2661 SERVICIOS', 'Servicio SAP': 'SGR', Labor: 'SGR', Total: 300, Tarifa: 150 }),
+    ]);
+    const { byUniverse, overall } = financeSummary(buildFinanceRows(inputs, '2026-01-01'));
+    const amounts = Object.fromEntries(byUniverse.map((group) => [group.key, group.total]));
+    expect(amounts).toEqual({ CONCILIABLE: 694.04, MECANIZADA_CASUR: 500, FUERA_CONCILIACION: 300 });
+    expect(overall.total).toBe(1494.04);
+  });
+
   it('clasifica contratistas con las reglas de la conciliación', () => {
     expect(financeClass({ contractorCode: 'CS2661', labor: 'SGR', service: 'SGR' })).toBe('CS2661');
     expect(financeClass({ contractorCode: 'CS3317', labor: 'CAP', service: 'AAI' })).toBe('AEREA');
@@ -104,7 +129,7 @@ describe('tarifas y calidad de datos', () => {
     ]);
     const ids = assessDataQuality(inputs, { atypicalTariffPct: 5 }).map((item) => item.id);
     expect(ids).toEqual(
-      expect.arrayContaining(['prefactura-duplicates', 'prefactura-total', 'date-outside-week', 'lots-missing']),
+      expect.arrayContaining(['repetition-DUPLICADO_EXACTO', 'prefactura-total', 'date-outside-week', 'lots-missing']),
     );
   });
 });

@@ -417,7 +417,10 @@ td.tariff-atypical::after {
   gap: 16px;
 }
 .finance-toolbar {
-  grid-template-columns: repeat(6, minmax(0, 1fr)) minmax(180px, 1.4fr) auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.finance-duplicates {
+  margin-top: 0;
 }
 .finance-toolbar .search-box {
   display: flex;

@@ -6,6 +6,7 @@ import {
   FINANCE_CLASSES,
   FINANCE_CLASS_ORDER,
   FINANCE_DIMENSIONS,
+  FINANCE_UNIVERSES,
   aggregateFinance,
   buildFinanceRows,
   financeSummary,
@@ -16,9 +17,12 @@ import { isBlockingPending } from '../../engine/indicators';
 import { normalizeText } from '../../engine/normalize';
 import { comparePeriods } from '../../engine/periods';
 import { buildTariffProfile } from '../../engine/tariffs';
+import { classifyRepetitions } from '../../engine/repetitions';
 import { formatCurrency, formatNumber } from '../../lib/format';
 import { periodLongText, periodText, percentText } from '../../lib/labels';
 import { exportSheetsToExcel } from '../../lib/sheet';
+
+const SCOPE_LABELS = { PRODUCERS: 'Productores', INTERNAL: 'CASUR interno', BOTH: 'Ambos universos' };
 
 const VIEWS = [
   ['executive', 'Resumen ejecutivo'],
@@ -46,6 +50,7 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
     hacienda: 'all',
     financeClass: 'all',
     contractor: 'all',
+    universe: 'all',
     search: '',
   });
   const [producerDimension, setProducerDimension] = useState('producer');
@@ -73,6 +78,7 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
         (filters.hacienda === 'all' || row.hacienda === filters.hacienda) &&
         (filters.financeClass === 'all' || row.financeClass === filters.financeClass) &&
         (filters.contractor === 'all' || (row.contractorCode || 'SIN CÓDIGO') === filters.contractor) &&
+        (filters.universe === 'all' || row.universe === filters.universe) &&
         (!search ||
           normalizeText(
             `${row.producerName} ${row.hacienda} ${row.suerte} ${row.labor} ${row.service} ${row.serviceName} ${row.pFact}`,
@@ -81,6 +87,11 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
   }, [allRows, filters]);
 
   const summary = useMemo(() => financeSummary(rows), [rows]);
+  // Posibles duplicados dentro de la vista filtrada: se informan aparte y NO se descuentan del total.
+  const repetitions = useMemo(() => {
+    const billedIds = new Set(rows.map((row) => row.id));
+    return classifyRepetitions(inputs.prefactura.filter((row) => billedIds.has(row.id))).summary;
+  }, [rows, inputs.prefactura]);
   const pending = useMemo(
     () => (analysis ? pendingByProducer(analysis.findings, allRows, isBlockingPending) : new Map()),
     [analysis, allRows],
@@ -161,7 +172,11 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
               'C$ por ha de suerte': overall.perHa ?? '',
               'HA trabajadas': overall.haUnits,
               'C$ por HA trabajada': overall.perHaWorked ?? '',
-              Fuente: 'Columna Total de la Prefactura SIAGRI (sin recalcular)',
+              Fuente: 'Columna Total de la Prefactura SIAGRI (sin recalcular ni descontar)',
+              ...Object.fromEntries(summary.byUniverse.map((group) => [`Universo · ${group.label}`, group.total])),
+              'Posibles duplicados exactos (copias, sin descontar)': repetitions.DUPLICADO_EXACTO.extraAmount,
+              'Mismo cobro en otra prefactura (copias, sin descontar)': repetitions.COBRO_EN_OTRA_PREFACTURA.extraAmount,
+              'Ámbito de conciliación (solo Nómina)': SCOPE_LABELS[parameters.scope] ?? parameters.scope,
             },
           ],
         },
@@ -214,6 +229,8 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
           name: 'Prefacturas',
           rows: invoices.map((invoice) => ({
             'P.FACT': invoice.pFact,
+            'Año operativo': invoice.year ?? '',
+            'Número repetido en otro productor/año': invoice.reusedNumber ? 'Sí' : 'No',
             Productor: invoice.producerName,
             Código: invoice.producerCode,
             Finca: invoice.haciendas,
@@ -373,6 +390,17 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
             ))}
           </select>
         </label>
+        <label>
+          <span>Universo</span>
+          <select value={filters.universe} onChange={(event) => setFilter('universe', event.target.value)}>
+            <option value="all">Todos</option>
+            {Object.entries(FINANCE_UNIVERSES).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="finance-search">
           <span>Buscar</span>
           <span className="search-box">
@@ -388,7 +416,7 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
           className="exec-reset"
           disabled={!activeFilters}
           onClick={() =>
-            setFilters({ from: '', to: '', producer: 'all', hacienda: 'all', financeClass: 'all', contractor: 'all', search: '' })
+            setFilters({ from: '', to: '', producer: 'all', hacienda: 'all', financeClass: 'all', contractor: 'all', universe: 'all', search: '' })
           }
         >
           Restablecer {activeFilters ? `(${activeFilters})` : ''}
@@ -397,9 +425,9 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
 
       <div className="metric-grid">
         <Metric
-          label="Total facturado"
+          label="Total informado por SIAGRI"
           value={money(overall.total)}
-          note={`${overall.rows.toLocaleString('es-NI')} líneas de prefactura`}
+          note={`${overall.rows.toLocaleString('es-NI')} líneas de prefactura · columna Total, sin descontar posibles duplicados`}
           tone="primary"
         />
         <Metric
@@ -408,14 +436,14 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
           note={`${overall.producers} productores · ${overall.haciendas} fincas`}
         />
         <Metric
-          label="C$ por ha de suerte"
+          label="Prefacturado por ha de suerte"
           value={perHaText(overall.perHa)}
-          note={`${formatNumber(overall.area)} ha físicas en ${overall.lotsWithArea} de ${overall.lots} suertes`}
+          note={`Monto de Prefactura ÷ ${formatNumber(overall.area)} ha físicas (${overall.lotsWithArea} de ${overall.lots} suertes con área). No es el costo total de producción por hectárea.`}
         />
         <Metric
-          label="Tarifa media por HA trabajada"
+          label="Prefacturado por HA trabajada"
           value={perHaText(overall.perHaWorked)}
-          note={`${formatNumber(overall.haUnits)} HA de trabajo acumulado (UM HA)`}
+          note={`Monto de líneas con UM HA ÷ ${formatNumber(overall.haUnits)} HA de trabajo acumulado. No equivale a área física.`}
         />
         <Metric
           label={`Última semana · ${periodText(summary.lastPeriod?.key, multiYear)}`}
@@ -428,6 +456,43 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
           tone={lastChange != null && lastChange < 0 ? 'warning' : ''}
         />
       </div>
+
+      {(repetitions.DUPLICADO_EXACTO.extraRows > 0 || repetitions.COBRO_EN_OTRA_PREFACTURA.extraRows > 0) && (
+        <div className="alert-strip warning finance-duplicates">
+          <span>
+            <strong>Posibles duplicados incluidos en el total (sin descontar mientras no se validen):</strong>{' '}
+            {repetitions.DUPLICADO_EXACTO.extraRows} copia(s) exacta(s) por {money(repetitions.DUPLICADO_EXACTO.extraAmount)}
+            {repetitions.COBRO_EN_OTRA_PREFACTURA.extraRows > 0 &&
+              ` · ${repetitions.COBRO_EN_OTRA_PREFACTURA.extraRows} cobro(s) repetido(s) en otra prefactura por ${money(repetitions.COBRO_EN_OTRA_PREFACTURA.extraAmount)}`}
+            {repetitions.MISMA_CANTIDAD_TARIFA_DISTINTA.groups > 0 &&
+              ` · ${repetitions.MISMA_CANTIDAD_TARIFA_DISTINTA.groups} grupo(s) con misma cantidad y tarifas distintas (revisar)`}
+            . Detalle en Actualizar archivos → Calidad de datos.
+          </span>
+        </div>
+      )}
+
+      <section className="panel finance-universes">
+        <div className="panel-head">
+          <div>
+            <h3>Universos del total</h3>
+            <p>
+              El total suma montos que la conciliación trata por separado. El ámbito de conciliación (
+              {SCOPE_LABELS[parameters.scope] ?? parameters.scope}) solo filtra la Nómina; la Prefactura se incluye completa porque
+              toda corresponde a productores. Compare con la conciliación solo el universo “Conciliable contra Nómina”.
+            </p>
+          </div>
+        </div>
+        <div className="bar-list">
+          {summary.byUniverse.map((group) => (
+            <button key={group.key} className="bar-row" onClick={() => setFilter('universe', group.key)}>
+              <span>{group.label}</span>
+              <ShareBar value={group.total} max={overall.total} />
+              <b>{money(group.total)}</b>
+              <small>{percentText(overall.total ? (group.total / overall.total) * 100 : 0)}</small>
+            </button>
+          ))}
+        </div>
+      </section>
 
       {view === 'executive' && (
         <>
@@ -523,8 +588,9 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
                 <div>
                   <h3>Nómina pendiente de prefacturar por productor</h3>
                   <p>
-                    Casos de la conciliación sin cobro o con cobro parcial (todo el período conciliado). Se expresan en unidades;
-                    no se valorizan porque la tarifa de un mismo servicio varía.
+                    Casos de la conciliación sin cobro o con cobro parcial (todo el período conciliado, ámbito{' '}
+                    {SCOPE_LABELS[parameters.scope] ?? parameters.scope}; no cambia con los filtros de esta página). Se expresan en
+                    unidades; no se valorizan porque la tarifa de un mismo servicio varía.
                   </p>
                 </div>
               </div>
@@ -755,12 +821,21 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
           </div>
           <DataTable
             rows={invoices}
-            rowKey={(invoice) => invoice.pFact}
+            rowKey={(invoice) => invoice.key}
             onRowClick={(invoice) =>
-              openDetail(`Prefactura ${invoice.pFact} · ${invoice.producerName}`, rowsFor('invoice', invoice.pFact))
+              openDetail(`Prefactura ${invoice.pFact} · ${invoice.producerName}`, rowsFor('invoice', invoice.key))
             }
             columns={[
-              { key: 'pFact', label: 'P.FACT', render: (invoice) => <strong>{invoice.pFact}</strong> },
+              {
+                key: 'pFact',
+                label: 'P.FACT',
+                render: (invoice) => (
+                  <strong title={invoice.reusedNumber ? 'El mismo número aparece con otro productor o año' : undefined}>
+                    {invoice.pFact}
+                    {invoice.reusedNumber ? ` · ${invoice.year}` : ''}
+                  </strong>
+                ),
+              },
               { key: 'producerName', label: 'Productor' },
               { key: 'haciendas', label: 'Finca' },
               {
@@ -830,6 +905,7 @@ const detailExportRow = (row) => ({
   'P.FACT': row.pFact,
   Contratista: row.contractorCode,
   Tipo: FINANCE_CLASSES[row.financeClass],
+  Universo: FINANCE_UNIVERSES[row.universe],
   Archivo: row.sourceFile,
   Fila: row.sourceRow,
 });
@@ -891,7 +967,7 @@ function FinanceDetailDrawer({ detail, multiYear, onClose }) {
             </div>
             <div className="detail">
               <span>Prefacturas</span>
-              <strong>{new Set(rows.map((row) => row.pFact)).size}</strong>
+              <strong>{new Set(rows.map((row) => row.invoiceKey)).size}</strong>
             </div>
             <div className="detail">
               <span>Suertes</span>

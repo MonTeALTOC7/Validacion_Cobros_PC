@@ -59,7 +59,8 @@ export const laborDisplayName = (row) => LABOR_NAMES[row.labor] || row.name || r
  */
 export const buildTrackingRows = (inputs, startDate) => {
   const rows = buildActivityRows(inputs, startDate);
-  const key = (row) => [row.week, row.hacienda, row.suerte, row.labor, row.service, row.unit].join('|');
+  // El año operativo forma parte de la clave: la semana 10 de 2026 y la de 2027 son períodos distintos.
+  const key = (row) => [row.year ?? '', row.week, row.hacienda, row.suerte, row.labor, row.service, row.unit].join('|');
   const payrollKeys = new Set(rows.filter((row) => row.source === 'Nómina').map(key));
   return rows.filter((row) => row.source === 'Nómina' || (row.classification === 'Mecanizada' && !payrollKeys.has(key(row))));
 };

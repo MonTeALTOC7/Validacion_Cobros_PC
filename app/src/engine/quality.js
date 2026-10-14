@@ -4,7 +4,7 @@ import { CASUR_CONTRACTOR, DIRECT_SERVICES, MECHANIZED_SERVICES, TPS_BILLED_SERV
 import { SKIP_REASON_LABELS } from './importers';
 import { groupBy, lotKey, round } from './normalize';
 import { buildOfficialCalendar, periodKey } from './periods';
-import { findDuplicateRows } from './reconciliation';
+import { classifyRepetitions } from './repetitions';
 import { buildTariffProfile, isAtypicalTariff } from './tariffs';
 
 const MAX_EXAMPLES = 12;
@@ -87,21 +87,51 @@ export const assessDataQuality = (inputs, options = {}) => {
     }
   }
 
-  // 3. Duplicados exactos de Prefactura
-  const duplicates = findDuplicateRows(prefactura);
-  if (duplicates.groupsCount) {
-    const rows = prefactura.filter((row) => duplicates.groupSizeById.has(row.id));
+  // 3. Repeticiones de Prefactura (clasificadas; ninguna se elimina ni se descuenta)
+  const repetitions = classifyRepetitions(prefactura);
+  const money = (value) => value.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const repetitionIssues = [
+    [
+      'DUPLICADO_EXACTO',
+      'warning',
+      (s) => `Prefactura: ${s.groups} grupo(s) de filas idénticas`,
+      (s) =>
+        `${s.extraRows} copia(s) extra por C$ ${money(s.extraAmount)} (incluidas en el total informado, sin descontar). Idénticas en todos los campos, incluidos Total y P.FACT.`,
+    ],
+    [
+      'COBRO_EN_OTRA_PREFACTURA',
+      'warning',
+      (s) => `Prefactura: ${s.groups} cobro(s) repetido(s) en otra prefactura`,
+      (s) =>
+        `Mismo lote, fecha, servicio, cantidad, tarifa y total con P.FACT distinto. ${s.extraRows} copia(s) por C$ ${money(s.extraAmount)}, sin descontar.`,
+    ],
+    [
+      'MISMA_CANTIDAD_TARIFA_DISTINTA',
+      'info',
+      (s) => `Prefactura: ${s.groups} grupo(s) con la misma cantidad y tarifas distintas`,
+      () => 'Misma clave de cobro (fecha, lote, labor, servicio, P.FACT) y misma cantidad con tarifas distintas. Puede ser legítimo (tarifa normal y doble); revisar.',
+    ],
+    [
+      'VARIAS_LINEAS_MISMA_CLAVE',
+      'info',
+      (s) => `Prefactura: ${s.groups} clave(s) de cobro con varias líneas`,
+      () => 'Misma fecha, lote, servicio y P.FACT con cantidades distintas. Es habitual; se informa solo como dato.',
+    ],
+  ];
+  for (const [kind, severity, title, detail] of repetitionIssues) {
+    const summary = repetitions.summary[kind];
+    if (!summary.groups) continue;
+    const rows = repetitions.groups.filter((group) => group.kind === kind).flatMap((group) => group.rows);
     issues.push({
       ...issue(
-        'prefactura-duplicates',
-        'warning',
-        `Prefactura: ${duplicates.groupsCount} grupo(s) de filas idénticas`,
-        `${duplicates.extraRows} copia(s) extra por C$ ${duplicates.extraAmount.toLocaleString('es-NI', { minimumFractionDigits: 2 })}. Mismo P.FACT, fecha, lote, servicio, unidades y tarifa. No se eliminan: se marcan en la conciliación.`,
-        rows.map((row) =>
-          example('Prefactura', row, `P.FACT ${row.pFact} · ${row.service} · ${row.units} ${row.unit} × ${row.tariff}`),
-        ),
+        `repetition-${kind}`,
+        severity,
+        title(summary),
+        detail(summary),
+        rows.map((row) => example('Prefactura', row, `P.FACT ${row.pFact} · ${row.service} · ${row.units} ${row.unit} × ${row.tariff} = ${row.total}`)),
       ),
-      count: duplicates.extraRows,
+      count: kind === 'DUPLICADO_EXACTO' || kind === 'COBRO_EN_OTRA_PREFACTURA' ? summary.extraRows : summary.groups,
+      amount: summary.extraAmount,
     });
   }
 
