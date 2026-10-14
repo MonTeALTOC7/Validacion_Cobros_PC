@@ -1,49 +1,105 @@
-export const normalizeText = (a) =>
-  String(a ?? '')
+// Normalización de valores leídos de los reportes SIAGRI.
+// Todas las funciones son puras y no dependen del navegador.
+
+/** Texto comparable: sin tildes ni caracteres de reemplazo, espacios colapsados y en mayúsculas. */
+export const normalizeText = (value) =>
+  String(value ?? '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\uFFFD/g, '')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/�/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .toUpperCase();
-export const cleanCode = (a) => {
-  const s = String(a ?? '').trim();
-  return s.endsWith('.0') ? s.slice(0, -2) : s;
+
+/** Código tal como viene en Excel, sin el sufijo ".0" que agregan algunas exportaciones numéricas. */
+export const cleanCode = (value) => {
+  const text = String(value ?? '').trim();
+  return text.endsWith('.0') ? text.slice(0, -2) : text;
 };
-export const normalizeSuerte = (a) => {
-  const s = cleanCode(a).toUpperCase();
-  const t = s.match(/^(\d+)([A-Z]*)$/);
-  return t ? `${t[1].padStart(2, '0')}${t[2]}` : s;
+
+/** Suerte con al menos dos dígitos y sufijo de letras: "5" → "05", "5a" → "05A". */
+export const normalizeSuerte = (value) => {
+  const text = cleanCode(value).toUpperCase();
+  const match = text.match(/^(\d+)([A-Z]*)$/);
+  return match ? `${match[1].padStart(2, '0')}${match[2]}` : text;
 };
-export const toNumber = (a) => {
-  if (typeof a == 'number') return Number.isFinite(a) ? a : 0;
-  const s = Number(
-    String(a ?? '')
-      .replace(/,/g, '')
-      .trim(),
-  );
-  return Number.isFinite(s) ? s : 0;
+
+/**
+ * Número desde una celda. Las comas se interpretan como separador de miles (formato SIAGRI).
+ * Un valor no numérico devuelve 0; use `parseNumberCell` cuando necesite distinguirlo.
+ */
+export const toNumber = (value) => parseNumberCell(value).value;
+
+/** Igual que `toNumber`, pero informa si la celda no era numérica para poder advertirlo. */
+export const parseNumberCell = (value) => {
+  if (typeof value === 'number') return Number.isFinite(value) ? { value, valid: true } : { value: 0, valid: false };
+  const text = String(value ?? '').trim();
+  if (text === '') return { value: 0, valid: true, empty: true };
+  const parsed = Number(text.replace(/,/g, ''));
+  return Number.isFinite(parsed) ? { value: parsed, valid: true } : { value: 0, valid: false };
 };
-export const toIsoDate = (a) => {
-  if (a instanceof Date && !Number.isNaN(a.getTime())) return a.toISOString().slice(0, 10);
-  if (typeof a == 'number') return new Date(Date.UTC(1899, 11, 30) + a * 864e5).toISOString().slice(0, 10);
-  const s = new Date(String(a ?? ''));
-  return Number.isNaN(s.getTime()) ? '' : s.toISOString().slice(0, 10);
-};
-export const extractContractorCode = (a) => {
-  var s;
-  return ((s = normalizeText(a).match(/CS\d+/)) == null ? undefined : s[0]) ?? '';
-};
-export const lotKey = (a, s) => `${normalizeText(a)}|${normalizeSuerte(s)}`;
-export const round = (a, s = 4) => Number(a.toFixed(s));
-export const withinTolerance = (a, s, t) => Math.abs(a - s) <= t;
-export const hashId = (...a) => {
-  let s = 2166136261;
-  const t = a.map((n) => String(n ?? '')).join('|');
-  for (let n = 0; n < t.length; n += 1) {
-    s ^= t.charCodeAt(n);
-    s = Math.imul(s, 16777619);
+
+/**
+ * Fecha ISO (AAAA-MM-DD) desde una celda de Excel.
+ * - Date (SheetJS con cellDates): se toma la fecha UTC; correcto en Nicaragua (UTC−6).
+ * - Número: serial de Excel (sistema 1900).
+ * - Texto: se aceptan AAAA-MM-DD y DD/MM/AAAA (formato regional); otros formatos se rechazan
+ *   para no confundir día y mes.
+ */
+export const toIsoDate = (value) => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return new Date(Date.UTC(1899, 11, 30) + value * 864e5).toISOString().slice(0, 10);
   }
-  return `id-${(s >>> 0).toString(16)}`;
+  const text = String(value ?? '').trim();
+  let match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return validIso(+match[1], +match[2], +match[3]);
+  match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  if (match) {
+    const year = match[3].length === 2 ? 2000 + Number(match[3]) : Number(match[3]);
+    return validIso(year, +match[2], +match[1]);
+  }
+  return '';
 };
-export const sumBy = (a, s) => a.reduce((t, n) => t + s(n), 0);
+
+const validIso = (year, month, day) => {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return '';
+  return date.toISOString().slice(0, 10);
+};
+
+/** Primer código de contratista "CS####" dentro del texto de la columna Contratista. */
+export const extractContractorCode = (value) => normalizeText(value).match(/CS\d+/)?.[0] ?? '';
+
+/** Clave de lote usada por el motor: nombre de hacienda normalizado + suerte normalizada. */
+export const lotKey = (hacienda, suerte) => `${normalizeText(hacienda)}|${normalizeSuerte(suerte)}`;
+
+export const round = (value, decimals = 4) => Number(value.toFixed(decimals));
+
+export const withinTolerance = (a, b, tolerance) => Math.abs(a - b) <= tolerance;
+
+/** Identificador determinista (FNV-1a de 32 bits) a partir de las partes indicadas. */
+export const hashId = (...parts) => {
+  let hash = 2166136261;
+  const text = parts.map((part) => String(part ?? '')).join('|');
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `id-${(hash >>> 0).toString(16)}`;
+};
+
+export const sumBy = (items, select) => items.reduce((total, item) => total + select(item), 0);
+
+export const unique = (items) => [...new Set(items)];
+
+export const groupBy = (items, keyOf) => {
+  const groups = new Map();
+  for (const item of items) {
+    const key = keyOf(item);
+    const list = groups.get(key);
+    if (list) list.push(item);
+    else groups.set(key, [item]);
+  }
+  return groups;
+};

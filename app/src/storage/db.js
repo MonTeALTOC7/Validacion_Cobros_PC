@@ -1,8 +1,10 @@
+// Persistencia local (IndexedDB vía Dexie). Base: "conciliador-casur".
 import Dexie from 'dexie';
 
 // IMPORTANTE: el esquema debe permanecer en la versión 1. El módulo "Seguimiento de Labores"
 // de la App Maestra comparte el mismo origen (montealtoc7.github.io) y abre esta misma base con
 // un bundle que declara la versión 1; subirla provocaría VersionError en ese módulo.
+// Los datos nuevos se guardan como claves adicionales del store `values` (sin cambiar el esquema).
 class ConciliadorDB extends Dexie {
   constructor() {
     super('conciliador-casur');
@@ -13,48 +15,26 @@ class ConciliadorDB extends Dexie {
     });
   }
 }
+
 export const db = new ConciliadorDB();
-export const saveInputs = (a) =>
-  db.values.put({
-    key: 'inputs',
-    value: a,
-    updatedAt: new Date().toISOString(),
-  });
-export const loadInputs = async () => {
-  var a;
-  return (a = await db.values.get('inputs')) == null ? undefined : a.value;
-};
-export const saveAnalysis = (a) =>
-  db.values.put({
-    key: 'analysis',
-    value: a,
-    updatedAt: new Date().toISOString(),
-  });
-export const loadAnalysis = async () => {
-  var a;
-  return (a = await db.values.get('analysis')) == null ? undefined : a.value;
-};
-export const saveParameters = (a) =>
-  db.values.put({
-    key: 'parameters',
-    value: a,
-    updatedAt: new Date().toISOString(),
-  });
-export const loadParameters = async () => {
-  var a;
-  return (a = await db.values.get('parameters')) == null ? undefined : a.value;
-};
-export const saveReviewWorkspace = (a) =>
-  db.values.put({
-    key: 'review-workspace',
-    value: a,
-    updatedAt: new Date().toISOString(),
-  });
-export const loadReviewWorkspace = async () => {
-  var a;
-  return (a = await db.values.get('review-workspace')) == null ? undefined : a.value;
-};
-export const appendAudit = (a) => db.audit.put(a);
+
+const putValue = (key, value) => db.values.put({ key, value, updatedAt: new Date().toISOString() });
+const getValue = async (key) => (await db.values.get(key))?.value;
+
+export const saveInputs = (inputs) => putValue('inputs', inputs);
+export const loadInputs = () => getValue('inputs');
+export const saveAnalysis = (analysis) => putValue('analysis', analysis);
+export const loadAnalysis = () => getValue('analysis');
+export const saveParameters = (parameters) => putValue('parameters', parameters);
+export const loadParameters = () => getValue('parameters');
+export const saveReviewWorkspace = (workspace) => putValue('review-workspace', workspace);
+export const loadReviewWorkspace = () => getValue('review-workspace');
+export const saveLastUpdate = (summary) => putValue('last-update', summary);
+export const loadLastUpdate = () => getValue('last-update');
+
+export const appendAudit = (entry) => db.audit.put(entry);
+
+/** Borra datos, resultados, cierres y auditoría de este dispositivo. */
 export const clearLocalData = async () => {
   await db.transaction('rw', db.values, db.audit, db.closures, async () => {
     await db.values.clear();

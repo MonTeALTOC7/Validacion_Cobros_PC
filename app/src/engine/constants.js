@@ -1,4 +1,12 @@
-export const APP_VERSION = '0.7.0';
+// Catálogos y parámetros del motor de conciliación.
+// Las listas de servicios provienen del build v0.7 publicado (no existe especificación formal);
+// cualquier cambio debe documentarse y validarse con datos reales antes de publicarse.
+
+// eslint-disable-next-line no-undef
+export const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0-dev';
+// eslint-disable-next-line no-undef
+export const BUILD_DATE = typeof __BUILD_DATE__ === 'string' ? __BUILD_DATE__ : '';
+
 export const DEFAULT_PARAMETERS = {
   startDate: '2026-01-01',
   scope: 'PRODUCERS',
@@ -10,72 +18,48 @@ export const DEFAULT_PARAMETERS = {
   tolerancePAQ: 0.01,
   includeHistoricalInactive: true,
 };
+
+/** Servicios manuales que se concilian uno a uno: Nómina (base) contra Prefactura CS9999. */
 export const DIRECT_SERVICES = new Set([
-  '10005',
-  '10007',
-  '12001',
-  '12005',
-  '12007',
-  '13001',
-  '16013',
-  '17009',
-  '19014',
-  '19020',
-  '19035',
-  '19036',
-  '19071',
-  '19073',
-  '19074',
-  '21018',
-  '21022',
-  '21039',
-  '21076',
-  '21079',
-  '21080',
-  '24001',
-  '30017',
-  '30038',
-  '30059',
-  '30062',
-  '32019',
+  '10005', '10007', '12001', '12005', '12007', '13001', '16013', '17009', '19014', '19020',
+  '19035', '19036', '19071', '19073', '19074', '21018', '21022', '21039', '21076', '21079',
+  '21080', '24001', '30017', '30038', '30059', '30062', '32019',
 ]);
-export const TPS_RYA_SERVICES = new Set(['19084', '19085']);
-export const TPS_CUT_SERVICES = new Set(['19013']);
-export const TPS_UNLOAD_SERVICES = new Set(['19009', '19010', '32017']);
-const TPS_OTHER_STAGE_SERVICES = new Set(['19022', '19102']);
+
+/** Etapas de siembra que respaldan el paquete TPS (servicio SIE_INV en Prefactura). */
+export const TPS_RYA_SERVICES = new Set(['19084', '19085']); // Regada, acomodada y tapada: cantidad principal
+export const TPS_CUT_SERVICES = new Set(['19013']); // Corte de semilla: corrobora
+export const TPS_UNLOAD_SERVICES = new Set(['19009', '19010', '32017']); // Descargue: corrobora
+export const TPS_OTHER_STAGE_SERVICES = new Set(['19022', '19102']); // Otras etapas de siembra (no se comparan)
 export const TPS_STAGE_SERVICES = new Set([
   ...TPS_RYA_SERVICES,
   ...TPS_CUT_SERVICES,
   ...TPS_UNLOAD_SERVICES,
   ...TPS_OTHER_STAGE_SERVICES,
 ]);
+export const TPS_BILLED_SERVICE = 'SIE_INV';
+
+/** Servicios mecanizados (Prefactura). No tienen base en Nómina. */
 export const MECHANIZED_SERVICES = new Set([
-  '102207SL',
-  '102208SL',
-  '102209SL',
-  '102211SL',
-  '102211SP',
-  '102217SL',
-  '102217SP',
-  '122212SL',
-  '122212SP',
-  '187011SL',
-  '187011SP',
-  '187054SP',
-  'CF-100L',
-  'EBCM',
-  'EBLB',
-  'EBSL',
-  'PROPIO',
-  'SECCIONADO',
-  'TAPADO',
+  '102207SL', '102208SL', '102209SL', '102211SL', '102211SP', '102217SL', '102217SP', '122212SL',
+  '122212SP', '187011SL', '187011SP', '187054SP', 'CF-100L', 'EBCM', 'EBLB', 'EBSL', 'PROPIO',
+  'SECCIONADO', 'TAPADO',
 ]);
+
+/** Contratista CASUR cuyas prefacturas se concilian contra Nómina. */
+export const CASUR_CONTRACTOR = 'CS9999';
+
+/**
+ * TPS confirmados por negocio aunque la evidencia RYA de Nómina esté incompleta.
+ * Formato: "P.FACT|HACIENDA|SUERTE" (heredado del build v0.7).
+ */
 export const TPS_CONFIRMED_EXCEPTIONS = new Set([
   '16255|SALVADOR MARENCO CASTILLO|02',
   '16254|JOSE ANDRES PEREZ ALEMAN|10',
   '16257|CARLOS SIEZAR MORALES|02',
   '16381|PANSACO|25',
 ]);
+
 export const STATUS_LABELS = {
   CONCILIADO: 'Conciliado',
   NOMINA_SIN_COBRO: 'Nómina sin cobro',

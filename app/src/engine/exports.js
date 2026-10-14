@@ -1,140 +1,126 @@
-import { write as writeWorkbook, utils as XLSXUtils } from 'xlsx';
+// Exportaciones a Excel (informe de auditoría y revisión por correo).
+import { utils as XLSXUtils, write as writeWorkbook } from 'xlsx';
 import { STATUS_LABELS } from './constants';
 import { coverageStats, isBlockingPending } from './indicators';
 import { downloadBlob } from '../lib/format';
 
-const findingToExportRow = (a) => ({
-  Semana: a.week,
-  Hacienda: a.hacienda,
-  Suerte: a.suerte,
-  Tipo: a.type,
-  Estado: STATUS_LABELS[a.status] ?? a.status,
-  Labor: a.labor,
-  Servicio: a.service,
-  UM: a.unit,
-  'Unidades Nómina': a.payrollUnits,
-  'Unidades Prefactura': a.billedUnits,
-  Diferencia: a.difference,
-  Tarifa: a.tariff,
-  Total: a.amount,
-  'P.FACT': a.pFacts.join(', '),
-  Contratista: a.contractor,
-  Maestro: a.masterStatus,
-  Explicación: a.explanation,
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const today = () => new Date().toISOString().slice(0, 10);
+
+const saveWorkbook = (workbook, fileName) => {
+  const data = writeWorkbook(workbook, { bookType: 'xlsx', type: 'array', compression: true });
+  downloadBlob(new Blob([data], { type: XLSX_MIME }), fileName);
+};
+
+export const findingToExportRow = (finding) => ({
+  Semana: finding.week,
+  Hacienda: finding.hacienda,
+  Suerte: finding.suerte,
+  Tipo: finding.type,
+  Estado: STATUS_LABELS[finding.status] ?? finding.status,
+  Labor: finding.labor,
+  Servicio: finding.service,
+  UM: finding.unit,
+  'Unidades Nómina': finding.payrollUnits,
+  'Unidades Prefactura': finding.billedUnits,
+  Diferencia: finding.difference,
+  Tarifa: finding.tariff,
+  Total: finding.amount,
+  'P.FACT': finding.pFacts.join(', '),
+  Contratista: finding.contractor,
+  Maestro: finding.masterStatus,
+  Explicación: finding.explanation,
 });
-export const exportAuditWorkbook = (a, s) => {
-  const t = XLSXUtils.book_new();
-  const n = [
+
+export const exportAuditWorkbook = (analysis, inputs) => {
+  const workbook = XLSXUtils.book_new();
+  const coverage = coverageStats(analysis.findings);
+  const summary = [
     {
       Departamento: 'Negocios de Caña',
       Responsable: 'Carlos Tijerino',
-      'Generado el': a.generatedAt,
-      'Filas Nómina': a.coverage.payrollRows,
-      'Filas Prefactura': a.coverage.prefacturaRows,
-      Hallazgos: a.findings.length,
-      'Pendientes de cobro': a.findings.filter(isBlockingPending).length,
-      'Cobertura de cobro %': coverageStats(a.findings).percent,
-      'Sin prefacturar': coverageStats(a.findings).unpaid,
-      'Cobro parcial': coverageStats(a.findings).partial,
-      'TPS externos': a.findings.filter((r) => r.status === 'TPS_EXTERNO_VALIDO').length,
-      'Servicios sin clasificar': a.unknownServices.join(', '),
+      'Generado el': analysis.generatedAt,
+      'Filas Nómina': analysis.coverage.payrollRows,
+      'Filas Prefactura': analysis.coverage.prefacturaRows,
+      Hallazgos: analysis.findings.length,
+      'Pendientes de cobro': analysis.findings.filter(isBlockingPending).length,
+      'Cobertura de cobro %': coverage.percent,
+      'Sin prefacturar': coverage.unpaid,
+      'Cobro parcial': coverage.partial,
+      'TPS externos': analysis.findings.filter((f) => f.status === 'TPS_EXTERNO_VALIDO').length,
+      'Servicios sin clasificar': analysis.unknownServices.join(', '),
     },
   ];
-  XLSXUtils.book_append_sheet(t, XLSXUtils.json_to_sheet(n), 'Resumen');
-  XLSXUtils.book_append_sheet(t, XLSXUtils.json_to_sheet(a.findings.map(findingToExportRow)), 'Conciliación');
+  XLSXUtils.book_append_sheet(workbook, XLSXUtils.json_to_sheet(summary), 'Resumen');
+  XLSXUtils.book_append_sheet(workbook, XLSXUtils.json_to_sheet(analysis.findings.map(findingToExportRow)), 'Conciliación');
   XLSXUtils.book_append_sheet(
-    t,
-    XLSXUtils.json_to_sheet(
-      a.findings.filter((r) => r.type === 'TPS' || r.type === 'EXTERNAL_TPS').map(findingToExportRow),
-    ),
+    workbook,
+    XLSXUtils.json_to_sheet(analysis.findings.filter((f) => f.type === 'TPS' || f.type === 'EXTERNAL_TPS').map(findingToExportRow)),
     'TPS',
   );
+  XLSXUtils.book_append_sheet(workbook, XLSXUtils.json_to_sheet(analysis.findings.filter(isBlockingPending).map(findingToExportRow)), 'Pendientes');
   XLSXUtils.book_append_sheet(
-    t,
-    XLSXUtils.json_to_sheet(a.findings.filter(isBlockingPending).map(findingToExportRow)),
-    'Pendientes',
-  );
-  XLSXUtils.book_append_sheet(
-    t,
+    workbook,
     XLSXUtils.json_to_sheet(
-      s.files.map((r) => ({
-        Tipo: r.kind,
-        Archivo: r.name,
-        Filas: r.rows,
-        Tamaño: r.size,
-        Importado: r.importedAt,
-        SHA256: r.hash,
+      inputs.files.map((file) => ({
+        Tipo: file.kind,
+        Archivo: file.name,
+        Filas: file.rows,
+        Tamaño: file.size,
+        Importado: file.importedAt,
+        SHA256: file.hash,
       })),
     ),
     'Archivos',
   );
-  const i = writeWorkbook(t, {
-    bookType: 'xlsx',
-    type: 'array',
-    compression: true,
-  });
-  downloadBlob(
-    new Blob([i], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    }),
-    `auditoria_nomina_prefactura_${new Date().toISOString().slice(0, 10)}.xlsx`,
-  );
+  saveWorkbook(workbook, `auditoria_nomina_prefactura_${today()}.xlsx`);
 };
-export const exportReviewWorkbook = (a, s) => {
-  const t = XLSXUtils.book_new();
+
+export const exportReviewWorkbook = (review, workspace) => {
+  const workbook = XLSXUtils.book_new();
   XLSXUtils.book_append_sheet(
-    t,
+    workbook,
     XLSXUtils.json_to_sheet([
       {
         Departamento: 'Negocios de Caña',
         Responsable: 'Carlos Tijerino',
-        Archivo: s.file.name,
-        'Semanas solicitadas': `${a.requestedWeekStart}-${a.requestedWeekEnd}`,
-        'Semanas en archivo': `${a.fileWeekStart}-${a.fileWeekEnd}`,
-        'Filas recibidas': a.reviewRows,
-        'Cobros correctos': a.exact,
-        'Pendientes críticos': a.critical,
-        Advertencias: a.warnings,
-        'Filas fuera del período': a.outsidePeriodRows,
-        'Total recibido': a.total,
-        SHA256: s.file.hash,
-        Generado: a.generatedAt,
+        Archivo: workspace.file.name,
+        'Semanas solicitadas': `${review.requestedWeekStart}-${review.requestedWeekEnd}`,
+        'Semanas en archivo': `${review.fileWeekStart}-${review.fileWeekEnd}`,
+        'Filas recibidas': review.reviewRows,
+        'Cobros correctos': review.exact,
+        'Pendientes críticos': review.critical,
+        Advertencias: review.warnings,
+        'Filas fuera del período': review.outsidePeriodRows,
+        'Total recibido': review.total,
+        SHA256: workspace.file.hash,
+        Generado: review.generatedAt,
       },
     ]),
     'Resumen',
   );
   XLSXUtils.book_append_sheet(
-    t,
+    workbook,
     XLSXUtils.json_to_sheet(
-      a.findings.map((i) => ({
-        Semana: i.week,
-        Hacienda: i.hacienda,
-        Suerte: i.suerte,
-        Labor: i.labor,
-        Servicios: i.services.join(', '),
-        'Nombre servicio': i.serviceNames.join(', '),
-        Resultado: i.status,
-        'UM Nómina': i.unit,
-        'UM recibida': i.reviewUnit,
-        'Unidades Nómina': i.payrollUnits,
-        'Unidades recibidas': i.reviewUnits,
-        Diferencia: i.difference,
-        Tarifa: i.tariff,
-        Total: i.total,
-        Explicación: i.explanation,
+      review.findings.map((finding) => ({
+        Semana: finding.week,
+        Hacienda: finding.hacienda,
+        Suerte: finding.suerte,
+        Labor: finding.labor,
+        Servicios: finding.services.join(', '),
+        'Nombre servicio': finding.serviceNames.join(', '),
+        Resultado: finding.status,
+        'UM Nómina': finding.unit,
+        'UM recibida': finding.reviewUnit,
+        'Unidades Nómina': finding.payrollUnits,
+        'Unidades recibidas': finding.reviewUnits,
+        Diferencia: finding.difference,
+        Tarifa: finding.tariff,
+        Total: finding.total,
+        Explicación: finding.explanation,
       })),
     ),
     'Validación',
   );
-  const n = writeWorkbook(t, {
-    bookType: 'xlsx',
-    type: 'array',
-    compression: true,
-  });
-  downloadBlob(
-    new Blob([n], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    }),
-    `revision_por_correo_S${a.requestedWeekStart}-S${a.requestedWeekEnd}_${new Date().toISOString().slice(0, 10)}.xlsx`,
-  );
+  saveWorkbook(workbook, `revision_por_correo_S${review.requestedWeekStart}-S${review.requestedWeekEnd}_${today()}.xlsx`);
 };

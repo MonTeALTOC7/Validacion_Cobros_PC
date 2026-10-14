@@ -1,109 +1,74 @@
-import {
-  parseExampleFile,
-  parseMasterFile,
-  parsePayrollFile,
-  parsePrefacturaFile,
-  parseReviewFile,
-} from '../engine/importers';
+// Precarga de los Excel publicados en datos/ (solo cuando el dispositivo no tiene datos guardados).
+import { parseExampleFile, parseMasterFile, parsePayrollFile, parsePrefacturaFile, parseReviewFile } from '../engine/importers';
 
+export const EMPTY_INPUTS = { payroll: [], prefactura: [], master: [], files: [] };
+
+const PARSERS = {
+  payroll: parsePayrollFile,
+  prefactura: parsePrefacturaFile,
+  master: parseMasterFile,
+  example: parseExampleFile,
+};
+
+const fetchJson = async (path) => {
+  const response = await fetch(path, { cache: 'no-store' });
+  return response.ok ? response.json() : null;
+};
+
+const fetchFile = async (path, name, lastModified) => {
+  const response = await fetch(path, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`No fue posible precargar ${name}.`);
+  const blob = await response.blob();
+  return new File([blob], name, { type: blob.type, lastModified });
+};
+
+/** Lee datos/manifest.json y procesa cada archivo con su importador. */
 export const loadPreloadedInputs = async () => {
-  const a = await fetch('./datos/manifest.json', {
-    cache: 'no-store',
-  });
-  if (!a.ok) return null;
-  const s = await a.json();
-  const t = {
-    payroll: [],
-    prefactura: [],
-    master: [],
-    files: [],
-  };
-  for (const n of s.files) {
-    const i = await fetch(`./datos/${n.path}`, {
-      cache: 'no-store',
-    });
-    if (!i.ok) throw new Error(`No fue posible precargar ${n.name}.`);
-    const r = await i.blob();
-    const l = new File([r], n.name, {
-      type: r.type,
-      lastModified: Date.parse(s.generatedAt) || Date.now(),
-    });
-    if (n.kind === 'payroll') {
-      const o = await parsePayrollFile(l);
-      t.payroll = o.rows;
-      o.file.source = 'PRELOADED';
-      t.files.push(o.file);
-    } else if (n.kind === 'prefactura') {
-      const o = await parsePrefacturaFile(l);
-      t.prefactura = o.rows;
-      o.file.source = 'PRELOADED';
-      t.files.push(o.file);
-    } else if (n.kind === 'master') {
-      const o = await parseMasterFile(l);
-      t.master = o.rows;
-      o.file.source = 'PRELOADED';
-      t.files.push(o.file);
-    } else {
-      const o = await parseExampleFile(l);
-      o.file.source = 'PRELOADED';
-      t.files.push(o.file);
-    }
+  const manifest = await fetchJson('./datos/manifest.json');
+  if (!manifest) return null;
+  const inputs = { payroll: [], prefactura: [], master: [], files: [] };
+  for (const entry of manifest.files) {
+    const file = await fetchFile(`./datos/${entry.path}`, entry.name, Date.parse(manifest.generatedAt) || Date.now());
+    const parsed = await (PARSERS[entry.kind] ?? parseExampleFile)(file);
+    if (entry.kind in inputs && entry.kind !== 'files') inputs[entry.kind] = parsed.rows;
+    parsed.file.source = 'PRELOADED';
+    inputs.files.push(parsed.file);
   }
-  return t;
+  return inputs;
 };
-export const refreshMasterFromPreload = async (a) => {
-  if (!a.master.some((t) => t.plantingDate === undefined || t.area === undefined)) return a;
-  const s = a.files.find((t) => t.kind === 'master');
-  if (!s) return a;
+
+/**
+ * Compatibilidad: maestros guardados por versiones anteriores sin fechas/área.
+ * Si el maestro guardado es el mismo archivo publicado (mismo hash), se vuelve a leer completo.
+ */
+export const refreshMasterFromPreload = async (inputs) => {
+  if (!inputs.master.some((row) => row.plantingDate === undefined || row.area === undefined)) return inputs;
+  const stored = inputs.files.find((file) => file.kind === 'master');
+  if (!stored) return inputs;
   try {
-    const t = await fetch('./datos/manifest.json', {
-      cache: 'no-store',
-    });
-    if (!t.ok) return a;
-    const i = (await t.json()).files.find((o) => o.kind === 'master');
-    if (!i) return a;
-    const r = await fetch('./datos/' + i.path, {
-      cache: 'no-store',
-    });
-    if (!r.ok) return a;
-    const l = await parseMasterFile(new File([await r.blob()], i.name));
-    return l.file.hash === s.hash
-      ? {
-          ...a,
-          master: l.rows,
-        }
-      : a;
+    const manifest = await fetchJson('./datos/manifest.json');
+    const entry = manifest?.files.find((file) => file.kind === 'master');
+    if (!entry) return inputs;
+    const response = await fetch('./datos/' + entry.path, { cache: 'no-store' });
+    if (!response.ok) return inputs;
+    const parsed = await parseMasterFile(new File([await response.blob()], entry.name));
+    return parsed.file.hash === stored.hash ? { ...inputs, master: parsed.rows } : inputs;
   } catch {
-    return a;
+    return inputs;
   }
 };
+
+/** Archivo de ejemplo para Revisión por Correo (datos/revision-manifest.json). */
 export const loadPreloadedReview = async () => {
-  const a = await fetch('./datos/revision-manifest.json', {
-    cache: 'no-store',
-  });
-  if (!a.ok) return null;
-  const s = await a.json();
-  const t = await fetch(`./datos/${s.file.path}`, {
-    cache: 'no-store',
-  });
-  if (!t.ok) throw new Error(`No fue posible precargar ${s.file.name}.`);
-  const n = await t.blob();
-  const i = new File([n], s.file.name, {
-    type: n.type,
-    lastModified: Date.parse(s.generatedAt) || Date.now(),
-  });
-  const r = await parseReviewFile(i);
-  r.file.source = 'PRELOADED';
+  const manifest = await fetchJson('./datos/revision-manifest.json');
+  if (!manifest) return null;
+  const file = await fetchFile(`./datos/${manifest.file.path}`, manifest.file.name, Date.parse(manifest.generatedAt) || Date.now());
+  const parsed = await parseReviewFile(file);
+  parsed.file.source = 'PRELOADED';
   return {
-    file: r.file,
-    rows: r.rows,
-    requestedWeekStart: s.requestedWeekStart,
-    requestedWeekEnd: s.requestedWeekEnd,
+    file: parsed.file,
+    rows: parsed.rows,
+    requestedWeekStart: manifest.requestedWeekStart,
+    requestedWeekEnd: manifest.requestedWeekEnd,
   };
-};
-export const EMPTY_INPUTS = {
-  payroll: [],
-  prefactura: [],
-  master: [],
-  files: [],
 };

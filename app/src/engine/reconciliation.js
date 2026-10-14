@@ -1,383 +1,372 @@
+// Motor de conciliación Nómina → Prefactura.
+// - DIRECT: servicios manuales, Nómina (base) contra Prefactura CS9999 por semana/hacienda/suerte/labor/servicio/UM.
+// - TPS: paquete de siembra SIE_INV contra las etapas de siembra registradas en Nómina.
+// - Excepciones: TPS externo, AAM, CS2661 y CAP/Vuelos Verdes.
 import {
+  CASUR_CONTRACTOR,
   DIRECT_SERVICES,
   MECHANIZED_SERVICES,
+  TPS_BILLED_SERVICE,
   TPS_CONFIRMED_EXCEPTIONS,
   TPS_CUT_SERVICES,
   TPS_RYA_SERVICES,
   TPS_STAGE_SERVICES,
   TPS_UNLOAD_SERVICES,
 } from './constants';
-import { hashId, lotKey, normalizeText, round, sumBy, withinTolerance } from './normalize';
+import { groupBy, hashId, lotKey, normalizeText, round, sumBy, withinTolerance } from './normalize';
 
-const toleranceForUnit = (a, s) =>
-  a === 'D-H'
-    ? s.toleranceDH
-    : a === 'HA'
-      ? s.toleranceHA
-      : a === 'MJO'
-        ? s.toleranceMJO
-        : a === 'PAQ'
-          ? s.tolerancePAQ
-          : 0.01;
-const directKey = (a) => [a.week, a.hacienda, a.suerte, a.labor, a.service, a.unit].join('|');
-const createMasterLookup = (a) => {
-  const s = new Map();
-  const t = new Map();
-  a.forEach((n) => {
-    s.set(lotKey(n.hacienda, n.suerte), n);
-    const i = t.get(n.hacienda) ?? [];
-    i.push(n);
-    t.set(n.hacienda, i);
+export const toleranceForUnit = (unit, parameters) =>
+  ({ 'D-H': parameters.toleranceDH, HA: parameters.toleranceHA, MJO: parameters.toleranceMJO, PAQ: parameters.tolerancePAQ })[unit] ??
+  0.01;
+
+export const directKey = (row) => [row.week, row.hacienda, row.suerte, row.labor, row.service, row.unit].join('|');
+
+/**
+ * Búsqueda en el Maestro: exacta por hacienda+suerte; si no existe, primera suerte de la hacienda
+ * (FALLBACK_HACIENDA); si tampoco, MISSING.
+ */
+export const createMasterLookup = (master) => {
+  const byLot = new Map();
+  const byHacienda = new Map();
+  master.forEach((row) => {
+    byLot.set(lotKey(row.hacienda, row.suerte), row);
+    const list = byHacienda.get(row.hacienda) ?? [];
+    list.push(row);
+    byHacienda.set(row.hacienda, list);
   });
-  return (n, i) => {
-    var o;
-    const r = s.get(lotKey(n, i));
-    if (r)
-      return {
-        status: 'EXACT',
-        row: r,
-      };
-    const l = (o = t.get(normalizeText(n))) == null ? undefined : o[0];
-    return l
-      ? {
-          status: 'FALLBACK_HACIENDA',
-          row: l,
-        }
-      : {
-          status: 'MISSING',
-          row: undefined,
-        };
+  return (hacienda, suerte) => {
+    const exact = byLot.get(lotKey(hacienda, suerte));
+    if (exact) return { status: 'EXACT', row: exact };
+    const fallback = byHacienda.get(normalizeText(hacienda))?.[0];
+    return fallback ? { status: 'FALLBACK_HACIENDA', row: fallback } : { status: 'MISSING', row: undefined };
   };
 };
-const directStatus = (a, s, t) =>
-  withinTolerance(a, s, t)
-    ? {
-        status: 'CONCILIADO',
-        severity: 'ok',
-      }
-    : a > 0 && s === 0
-      ? {
-          status: 'NOMINA_SIN_COBRO',
-          severity: 'critical',
-        }
-      : a === 0 && s > 0
-        ? {
-            status: 'COBRO_SIN_NOMINA',
-            severity: 'warning',
-          }
-        : s < a
-          ? {
-              status: 'COBRO_PARCIAL',
-              severity: 'critical',
-            }
-          : {
-              status: 'COBRO_EXCESO',
-              severity: 'info',
-            };
-const reconcileDirect = (a, s, t, n) => {
-  const i = new Map();
-  const r = new Map();
-  a.filter((l) => DIRECT_SERVICES.has(l.service)).forEach((l) => {
-    const o = directKey(l);
-    i.set(o, [...(i.get(o) ?? []), l]);
-  });
-  s.filter((l) => l.contractorCode === 'CS9999' && DIRECT_SERVICES.has(l.service)).forEach((l) => {
-    const o = directKey(l);
-    r.set(o, [...(r.get(o) ?? []), l]);
-  });
-  return Array.from(new Set([...i.keys(), ...r.keys()])).map((l) => {
-    var g;
-    var d;
-    const o = i.get(l) ?? [];
-    const x = r.get(l) ?? [];
-    const m = o[0] ?? x[0];
-    const f = round(sumBy(o, (R) => R.units));
-    const S = round(sumBy(x, (R) => R.units));
-    const A = directStatus(f, S, toleranceForUnit(m.unit, t));
-    const E = n(m.hacienda, m.suerte);
-    const D = ((g = x[0]) == null ? undefined : g.tariff) ?? 0;
-    let I = A.status;
-    let v = A.severity;
-    let N = `Nómina ${f} ${m.unit}; Prefactura ${S} ${m.unit}.`;
-    E.status === 'FALLBACK_HACIENDA' && I === 'CONCILIADO'
-      ? ((I = 'SUERTE_HISTORICA_DADA_DE_BAJA'),
-        (v = 'info'),
-        (N += ' La suerte no está en el Maestro vigente; se validó por Hacienda como registro histórico.'))
-      : E.status === 'MISSING' && (N += ' La Hacienda/Suerte no aparece en el Maestro vigente.');
-    x.some((R) => !R.pFact.trim()) &&
-      ((I = 'PREFACTURA_SIN_NUMERO'),
-      (v = 'critical'),
-      (N += ' Hay filas sin número P.FACT: no acreditan prefactura emitida y bloquean el cierre.'));
+
+export const directStatus = (payrollUnits, billedUnits, tolerance) => {
+  if (withinTolerance(payrollUnits, billedUnits, tolerance)) return { status: 'CONCILIADO', severity: 'ok' };
+  if (payrollUnits > 0 && billedUnits === 0) return { status: 'NOMINA_SIN_COBRO', severity: 'critical' };
+  if (payrollUnits === 0 && billedUnits > 0) return { status: 'COBRO_SIN_NOMINA', severity: 'warning' };
+  if (billedUnits < payrollUnits) return { status: 'COBRO_PARCIAL', severity: 'critical' };
+  return { status: 'COBRO_EXCESO', severity: 'info' };
+};
+
+export const reconcileDirect = (payroll, prefactura, parameters, lookupMaster) => {
+  const payrollGroups = groupBy(
+    payroll.filter((row) => DIRECT_SERVICES.has(row.service)),
+    directKey,
+  );
+  const billedGroups = groupBy(
+    prefactura.filter((row) => row.contractorCode === CASUR_CONTRACTOR && DIRECT_SERVICES.has(row.service)),
+    directKey,
+  );
+  return Array.from(new Set([...payrollGroups.keys(), ...billedGroups.keys()])).map((key) => {
+    const payrollRows = payrollGroups.get(key) ?? [];
+    const billedRows = billedGroups.get(key) ?? [];
+    const sample = payrollRows[0] ?? billedRows[0];
+    const payrollUnits = round(sumBy(payrollRows, (row) => row.units));
+    const billedUnits = round(sumBy(billedRows, (row) => row.units));
+    const base = directStatus(payrollUnits, billedUnits, toleranceForUnit(sample.unit, parameters));
+    const master = lookupMaster(sample.hacienda, sample.suerte);
+    let status = base.status;
+    let severity = base.severity;
+    let explanation = `Nómina ${payrollUnits} ${sample.unit}; Prefactura ${billedUnits} ${sample.unit}.`;
+    if (master.status === 'FALLBACK_HACIENDA' && status === 'CONCILIADO') {
+      status = 'SUERTE_HISTORICA_DADA_DE_BAJA';
+      severity = 'info';
+      explanation += ' La suerte no está en el Maestro vigente; se validó por Hacienda como registro histórico.';
+    } else if (master.status === 'MISSING') {
+      explanation += ' La Hacienda/Suerte no aparece en el Maestro vigente.';
+    }
+    if (billedRows.some((row) => !row.pFact.trim())) {
+      status = 'PREFACTURA_SIN_NUMERO';
+      severity = 'critical';
+      explanation += ' Hay filas sin número P.FACT: no acreditan prefactura emitida y bloquean el cierre.';
+    }
     return {
-      id: hashId('direct', l),
+      id: hashId('direct', key),
       type: 'DIRECT',
-      status: I,
-      severity: v,
-      week: m.week,
-      date: m.date,
-      haciendaCode: m.haciendaCode,
-      hacienda: m.hacienda,
-      suerte: m.suerte,
-      labor: m.labor,
-      service: m.service,
-      unit: m.unit,
-      payrollUnits: f,
-      billedUnits: S,
-      difference: round(S - f),
-      tariff: D,
+      status,
+      severity,
+      week: sample.week,
+      date: sample.date,
+      haciendaCode: sample.haciendaCode,
+      hacienda: sample.hacienda,
+      suerte: sample.suerte,
+      labor: sample.labor,
+      service: sample.service,
+      unit: sample.unit,
+      payrollUnits,
+      billedUnits,
+      difference: round(billedUnits - payrollUnits),
+      tariff: billedRows[0]?.tariff ?? 0,
       amount: round(
-        sumBy(x, (R) => R.total),
+        sumBy(billedRows, (row) => row.total),
         2,
       ),
-      pFacts: [...new Set(x.map((R) => R.pFact))],
-      contractor: ((d = x[0]) == null ? undefined : d.contractorCode) ?? 'CS9999',
-      explanation: N,
-      masterStatus: E.status,
-      payrollRowIds: o.map((R) => R.id),
-      prefacturaRowIds: x.map((R) => R.id),
+      pFacts: [...new Set(billedRows.map((row) => row.pFact))],
+      contractor: billedRows[0]?.contractorCode ?? CASUR_CONTRACTOR,
+      explanation,
+      masterStatus: master.status,
+      payrollRowIds: payrollRows.map((row) => row.id),
+      prefacturaRowIds: billedRows.map((row) => row.id),
     };
   });
 };
-const reconcileTps = (a, s, t, n) =>
-  s
-    .filter((i) => i.contractorCode === 'CS9999' && i.labor === 'TPS' && i.service === 'SIE_INV')
-    .map((i) => {
-      const r = a.filter(
-        (d) =>
-          d.hacienda === i.hacienda &&
-          d.suerte === i.suerte &&
-          TPS_STAGE_SERVICES.has(d.service) &&
-          d.week >= i.week - t.tpsWeeksBefore &&
-          d.week <= i.week + t.tpsWeeksAfter,
+
+const tpsVerdict = ({ ryaMatches, otherStageMatches, confirmedByBusiness }) => {
+  if (ryaMatches && otherStageMatches) {
+    return {
+      status: 'PAQUETE_TPS_VALIDADO_RYA_CORROBORADO',
+      severity: 'ok',
+      explanation: 'La cantidad TPS coincide con RYA y al menos otra etapa de siembra.',
+    };
+  }
+  if (ryaMatches) {
+    return {
+      status: 'PAQUETE_TPS_VALIDADO_RYA',
+      severity: 'info',
+      explanation: 'La cantidad TPS coincide con RYA; corte o descargue están incompletos.',
+    };
+  }
+  if (otherStageMatches) {
+    return {
+      status: 'PAQUETE_TPS_VALIDADO_UNA_ETAPA_CON_ADVERTENCIA',
+      severity: 'warning',
+      explanation: 'Una etapa de siembra coincide, pero RYA está ausente o incompleta.',
+    };
+  }
+  if (confirmedByBusiness) {
+    return {
+      status: 'TPS_COBRADO_CON_DIFERENCIA_NOMINA',
+      severity: 'warning',
+      explanation: 'Siembra y cobro confirmados por negocio; la evidencia RYA de Nómina está incompleta.',
+    };
+  }
+  return {
+    status: 'PAQUETE_TPS_REQUIERE_REVISION',
+    severity: 'warning',
+    explanation: 'Ninguna etapa de cantidad coincide con los PAQ cobrados.',
+  };
+};
+
+export const reconcileTps = (payroll, prefactura, parameters, lookupMaster) =>
+  prefactura
+    .filter((row) => row.contractorCode === CASUR_CONTRACTOR && row.labor === 'TPS' && row.service === TPS_BILLED_SERVICE)
+    .map((billed) => {
+      const stageRows = payroll.filter(
+        (row) =>
+          row.hacienda === billed.hacienda &&
+          row.suerte === billed.suerte &&
+          TPS_STAGE_SERVICES.has(row.service) &&
+          row.week >= billed.week - parameters.tpsWeeksBefore &&
+          row.week <= billed.week + parameters.tpsWeeksAfter,
       );
-      const l = round(
-        sumBy(
-          r.filter((d) => TPS_RYA_SERVICES.has(d.service)),
-          (d) => d.units,
-        ),
-      );
-      const o = round(
-        sumBy(
-          r.filter((d) => TPS_CUT_SERVICES.has(d.service)),
-          (d) => d.units,
-        ),
-      );
-      const x = round(
-        sumBy(
-          r.filter((d) => TPS_UNLOAD_SERVICES.has(d.service)),
-          (d) => d.units,
-        ),
-      );
-      const m = t.tolerancePAQ;
-      const f = withinTolerance(l, i.units, m);
-      const S = withinTolerance(o, i.units, m) || withinTolerance(x, i.units, m);
-      const A = withinTolerance(o, i.units, m) || withinTolerance(x, i.units, m);
-      const E = `${i.pFact}|${i.hacienda}|${i.suerte}`;
-      let D;
-      let I;
-      let v;
-      f && S
-        ? ((D = 'PAQUETE_TPS_VALIDADO_RYA_CORROBORADO'),
-          (I = 'ok'),
-          (v = 'La cantidad TPS coincide con RYA y al menos otra etapa de siembra.'))
-        : f
-          ? ((D = 'PAQUETE_TPS_VALIDADO_RYA'),
-            (I = 'info'),
-            (v = 'La cantidad TPS coincide con RYA; corte o descargue están incompletos.'))
-          : A
-            ? ((D = 'PAQUETE_TPS_VALIDADO_UNA_ETAPA_CON_ADVERTENCIA'),
-              (I = 'warning'),
-              (v = 'Una etapa de siembra coincide, pero RYA está ausente o incompleta.'))
-            : TPS_CONFIRMED_EXCEPTIONS.has(E)
-              ? ((D = 'TPS_COBRADO_CON_DIFERENCIA_NOMINA'),
-                (I = 'warning'),
-                (v = 'Siembra y cobro confirmados por negocio; la evidencia RYA de Nómina está incompleta.'))
-              : ((D = 'PAQUETE_TPS_REQUIERE_REVISION'),
-                (I = 'warning'),
-                (v = 'Ninguna etapa de cantidad coincide con los PAQ cobrados.'));
-      const N = [...new Set(r.map((d) => d.week))];
-      (D === 'PAQUETE_TPS_VALIDADO_RYA' || D === 'PAQUETE_TPS_VALIDADO_RYA_CORROBORADO') &&
-        N.some((d) => d !== i.week) &&
-        (v += ` Ciclo observado en semana(s) ${N.join(', ')}.`);
-      const g = n(i.hacienda, i.suerte);
+      const stageUnits = (services) =>
+        round(
+          sumBy(
+            stageRows.filter((row) => services.has(row.service)),
+            (row) => row.units,
+          ),
+        );
+      const stageRya = stageUnits(TPS_RYA_SERVICES);
+      const stageCut = stageUnits(TPS_CUT_SERVICES);
+      const stageUnload = stageUnits(TPS_UNLOAD_SERVICES);
+      const tolerance = parameters.tolerancePAQ;
+      const verdict = tpsVerdict({
+        ryaMatches: withinTolerance(stageRya, billed.units, tolerance),
+        otherStageMatches: withinTolerance(stageCut, billed.units, tolerance) || withinTolerance(stageUnload, billed.units, tolerance),
+        confirmedByBusiness: TPS_CONFIRMED_EXCEPTIONS.has(`${billed.pFact}|${billed.hacienda}|${billed.suerte}`),
+      });
+      let explanation = verdict.explanation;
+      const weeks = [...new Set(stageRows.map((row) => row.week))];
+      if (
+        (verdict.status === 'PAQUETE_TPS_VALIDADO_RYA' || verdict.status === 'PAQUETE_TPS_VALIDADO_RYA_CORROBORADO') &&
+        weeks.some((week) => week !== billed.week)
+      ) {
+        explanation += ` Ciclo observado en semana(s) ${weeks.join(', ')}.`;
+      }
       return {
-        id: hashId('tps', i.id),
+        id: hashId('tps', billed.id),
         type: 'TPS',
-        status: D,
-        severity: I,
-        week: i.week,
-        date: i.date,
-        haciendaCode: i.haciendaCode,
-        hacienda: i.hacienda,
-        suerte: i.suerte,
-        labor: i.labor,
-        service: i.service,
-        unit: i.unit,
-        payrollUnits: l,
-        billedUnits: i.units,
-        difference: round(i.units - l),
-        tariff: i.tariff,
-        amount: i.total,
-        pFacts: [i.pFact],
-        contractor: i.contractorCode,
-        explanation: v,
-        masterStatus: g.status,
-        payrollRowIds: r.map((d) => d.id),
-        prefacturaRowIds: [i.id],
-        stageCut: o,
-        stageUnload: x,
-        stageRya: l,
-        userConfirmed: D === 'TPS_COBRADO_CON_DIFERENCIA_NOMINA',
+        status: verdict.status,
+        severity: verdict.severity,
+        week: billed.week,
+        date: billed.date,
+        haciendaCode: billed.haciendaCode,
+        hacienda: billed.hacienda,
+        suerte: billed.suerte,
+        labor: billed.labor,
+        service: billed.service,
+        unit: billed.unit,
+        payrollUnits: stageRya,
+        billedUnits: billed.units,
+        difference: round(billed.units - stageRya),
+        tariff: billed.tariff,
+        amount: billed.total,
+        pFacts: [billed.pFact],
+        contractor: billed.contractorCode,
+        explanation,
+        masterStatus: lookupMaster(billed.hacienda, billed.suerte).status,
+        payrollRowIds: stageRows.map((row) => row.id),
+        prefacturaRowIds: [billed.id],
+        stageCut,
+        stageUnload,
+        stageRya,
+        userConfirmed: verdict.status === 'TPS_COBRADO_CON_DIFERENCIA_NOMINA',
       };
     });
-const classifyExceptions = (a, s) =>
-  a.flatMap((t) => {
-    let n;
-    let i = 'EXCLUDED';
-    let r = 'info';
-    let l = '';
-    if (
-      (t.contractorCode === 'CS3625' && t.labor === 'TPS' && t.service === 'SSCONTRA'
-        ? ((n = 'TPS_EXTERNO_VALIDO'),
-          (i = 'EXTERNAL_TPS'),
-          (r = 'ok'),
-          (l = 'Siembra contratada externamente; no se espera Nómina CASUR.'))
-        : t.labor === 'AAM'
-          ? ((n = 'EXCLUIDO_AAM'), (l = 'Aplicación aérea AAM excluida del cobro a productores.'))
-          : t.contractorCode === 'CS2661'
-            ? ((n = 'SEPARADO_CS2661'), (l = 'Contratista CS2661 reportado en universo separado.'))
-            : t.contractorCode === 'CS3317' &&
-              t.labor === 'CAP' &&
-              ((n = 'EXCEPCION_CAP_VALIDADA'),
-              (i = 'EXCEPTION'),
-              (r = 'ok'),
-              (l = 'Excepción CAP/Vuelos Verdes aceptada.')),
-      !n)
-    )
-      return [];
-    const o = s(t.hacienda, t.suerte);
+
+/** RYA de Nómina no usada por ningún TPS cobrado: pendiente de cobro. */
+const pendingTpsFromPayroll = (payroll, usedPayrollIds, lookupMaster) => {
+  const findings = [];
+  groupBy(
+    payroll.filter((row) => TPS_RYA_SERVICES.has(row.service) && !usedPayrollIds.has(row.id)),
+    directKey,
+  ).forEach((rows, key) => {
+    const sample = rows[0];
+    const units = round(sumBy(rows, (row) => row.units));
+    if (units <= 0) return;
+    findings.push({
+      id: hashId('tps-pending', key),
+      type: 'TPS',
+      status: 'NOMINA_SIN_COBRO',
+      severity: 'critical',
+      week: sample.week,
+      date: sample.date,
+      haciendaCode: sample.haciendaCode,
+      hacienda: sample.hacienda,
+      suerte: sample.suerte,
+      labor: sample.labor,
+      service: sample.service,
+      unit: sample.unit,
+      payrollUnits: units,
+      billedUnits: 0,
+      difference: -units,
+      tariff: 0,
+      amount: 0,
+      pFacts: [],
+      contractor: CASUR_CONTRACTOR,
+      explanation: 'RYA de Nómina sin TPS asociado en la ventana configurada. Revisar cobro pendiente o desfase.',
+      masterStatus: lookupMaster(sample.hacienda, sample.suerte).status,
+      payrollRowIds: rows.map((row) => row.id),
+      prefacturaRowIds: [],
+      stageRya: units,
+    });
+  });
+  return findings;
+};
+
+const exceptionRule = (row) => {
+  if (row.contractorCode === 'CS3625' && row.labor === 'TPS' && row.service === 'SSCONTRA') {
+    return {
+      status: 'TPS_EXTERNO_VALIDO',
+      type: 'EXTERNAL_TPS',
+      severity: 'ok',
+      explanation: 'Siembra contratada externamente; no se espera Nómina CASUR.',
+    };
+  }
+  if (row.labor === 'AAM') {
+    return { status: 'EXCLUIDO_AAM', type: 'EXCLUDED', severity: 'info', explanation: 'Aplicación aérea AAM excluida del cobro a productores.' };
+  }
+  if (row.contractorCode === 'CS2661') {
+    return { status: 'SEPARADO_CS2661', type: 'EXCLUDED', severity: 'info', explanation: 'Contratista CS2661 reportado en universo separado.' };
+  }
+  if (row.contractorCode === 'CS3317' && row.labor === 'CAP') {
+    return { status: 'EXCEPCION_CAP_VALIDADA', type: 'EXCEPTION', severity: 'ok', explanation: 'Excepción CAP/Vuelos Verdes aceptada.' };
+  }
+  return null;
+};
+
+export const classifyExceptions = (prefactura, lookupMaster) =>
+  prefactura.flatMap((row) => {
+    const rule = exceptionRule(row);
+    if (!rule) return [];
     return [
       {
-        id: hashId('exception', t.id),
-        type: i,
-        status: n,
-        severity: r,
-        week: t.week,
-        date: t.date,
-        haciendaCode: t.haciendaCode,
-        hacienda: t.hacienda,
-        suerte: t.suerte,
-        labor: t.labor,
-        service: t.service,
-        unit: t.unit,
+        id: hashId('exception', row.id),
+        type: rule.type,
+        status: rule.status,
+        severity: rule.severity,
+        week: row.week,
+        date: row.date,
+        haciendaCode: row.haciendaCode,
+        hacienda: row.hacienda,
+        suerte: row.suerte,
+        labor: row.labor,
+        service: row.service,
+        unit: row.unit,
         payrollUnits: 0,
-        billedUnits: t.units,
-        difference: t.units,
-        tariff: t.tariff,
-        amount: t.total,
-        pFacts: [t.pFact],
-        contractor: t.contractorCode,
-        explanation: l,
-        masterStatus: o.status,
+        billedUnits: row.units,
+        difference: row.units,
+        tariff: row.tariff,
+        amount: row.total,
+        pFacts: [row.pFact],
+        contractor: row.contractorCode,
+        explanation: rule.explanation,
+        masterStatus: lookupMaster(row.hacienda, row.suerte).status,
         payrollRowIds: [],
-        prefacturaRowIds: [t.id],
+        prefacturaRowIds: [row.id],
       },
     ];
   });
-const countDuplicateGroups = (a) => {
-  const s = new Map();
-  a.forEach((t) => {
-    const n = [
-      t.week,
-      t.date,
-      t.hacienda,
-      t.suerte,
-      t.labor,
-      t.service,
-      t.units,
-      t.unit,
-      t.tariff,
-      t.pFact,
-      t.contractorCode,
+
+/** Número de grupos de filas de Prefactura idénticas en semana, fecha, lote, servicio, unidades, tarifa, P.FACT y contratista. */
+export const countDuplicateGroups = (prefactura) => {
+  const counts = new Map();
+  prefactura.forEach((row) => {
+    const key = [
+      row.week,
+      row.date,
+      row.hacienda,
+      row.suerte,
+      row.labor,
+      row.service,
+      row.units,
+      row.unit,
+      row.tariff,
+      row.pFact,
+      row.contractorCode,
     ].join('|');
-    s.set(n, (s.get(n) ?? 0) + 1);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
   });
-  return [...s.values()].filter((t) => t > 1).length;
+  return [...counts.values()].filter((count) => count > 1).length;
 };
-export const runReconciliation = (a, s) => {
-  const t = s.startDate;
-  const n = a.prefactura.filter((v) => v.date >= t);
-  const i = createMasterLookup(a.master);
-  const r = new Set(n.map((v) => lotKey(v.hacienda, v.suerte)));
-  const l = a.payroll.filter((v) => {
-    var d;
-    if (v.date < t) return false;
-    if (s.scope === 'BOTH') return true;
-    const g =
-      !!((d = i(v.hacienda, v.suerte).row) != null && d.producerScope) || r.has(lotKey(v.hacienda, v.suerte));
-    return s.scope === 'PRODUCERS' ? g : !g;
+
+export const runReconciliation = (inputs, parameters) => {
+  const startDate = parameters.startDate;
+  const prefactura = inputs.prefactura.filter((row) => row.date >= startDate);
+  const lookupMaster = createMasterLookup(inputs.master);
+  const billedLots = new Set(prefactura.map((row) => lotKey(row.hacienda, row.suerte)));
+  const payroll = inputs.payroll.filter((row) => {
+    if (row.date < startDate) return false;
+    if (parameters.scope === 'BOTH') return true;
+    const isProducer = !!lookupMaster(row.hacienda, row.suerte).row?.producerScope || billedLots.has(lotKey(row.hacienda, row.suerte));
+    return parameters.scope === 'PRODUCERS' ? isProducer : !isProducer;
   });
-  const o = reconcileDirect(l, n, s, i);
-  const x = reconcileTps(l, n, s, i);
-  const m = new Set(x.flatMap((v) => v.payrollRowIds));
-  const f = new Map();
-  l.filter((v) => TPS_RYA_SERVICES.has(v.service) && !m.has(v.id)).forEach((v) => {
-    const N = directKey(v);
-    f.set(N, [...(f.get(N) ?? []), v]);
-  });
-  f.forEach((v, N) => {
-    const g = v[0];
-    const d = round(sumBy(v, (R) => R.units));
-    d <= 0 ||
-      x.push({
-        id: hashId('tps-pending', N),
-        type: 'TPS',
-        status: 'NOMINA_SIN_COBRO',
-        severity: 'critical',
-        week: g.week,
-        date: g.date,
-        haciendaCode: g.haciendaCode,
-        hacienda: g.hacienda,
-        suerte: g.suerte,
-        labor: g.labor,
-        service: g.service,
-        unit: g.unit,
-        payrollUnits: d,
-        billedUnits: 0,
-        difference: -d,
-        tariff: 0,
-        amount: 0,
-        pFacts: [],
-        contractor: 'CS9999',
-        explanation:
-          'RYA de Nómina sin TPS asociado en la ventana configurada. Revisar cobro pendiente o desfase.',
-        masterStatus: i(g.hacienda, g.suerte).status,
-        payrollRowIds: v.map((R) => R.id),
-        prefacturaRowIds: [],
-        stageRya: d,
-      });
-  });
-  const S = classifyExceptions(n, i);
-  const A = new Set([...DIRECT_SERVICES, ...TPS_STAGE_SERVICES, ...MECHANIZED_SERVICES, 'SIE_INV']);
-  const E = [
-    ...new Set(n.filter((v) => v.contractorCode === 'CS9999' && !A.has(v.service)).map((v) => v.service)),
+  const direct = reconcileDirect(payroll, prefactura, parameters, lookupMaster);
+  const tps = reconcileTps(payroll, prefactura, parameters, lookupMaster);
+  const usedPayrollIds = new Set(tps.flatMap((finding) => finding.payrollRowIds));
+  tps.push(...pendingTpsFromPayroll(payroll, usedPayrollIds, lookupMaster));
+  const exceptions = classifyExceptions(prefactura, lookupMaster);
+  const knownServices = new Set([...DIRECT_SERVICES, ...TPS_STAGE_SERVICES, ...MECHANIZED_SERVICES, TPS_BILLED_SERVICE]);
+  const unknownServices = [
+    ...new Set(prefactura.filter((row) => row.contractorCode === CASUR_CONTRACTOR && !knownServices.has(row.service)).map((row) => row.service)),
   ].sort();
-  const D = [...l.map((v) => v.week), ...n.map((v) => v.week)].filter(Boolean);
-  const I = [...o, ...x, ...S].sort((v, N) => N.week - v.week || v.hacienda.localeCompare(N.hacienda));
+  const weeks = [...payroll.map((row) => row.week), ...prefactura.map((row) => row.week)].filter(Boolean);
+  const findings = [...direct, ...tps, ...exceptions].sort((a, b) => b.week - a.week || a.hacienda.localeCompare(b.hacienda));
   return {
     generatedAt: new Date().toISOString(),
-    findings: I,
-    excludedRows: S.filter((v) => v.type === 'EXCLUDED').length,
-    mechanizedRows: n.filter((v) => v.contractorCode === 'CS9999' && MECHANIZED_SERVICES.has(v.service))
-      .length,
-    unknownServices: E,
-    duplicateGroups: countDuplicateGroups(n),
+    findings,
+    excludedRows: exceptions.filter((finding) => finding.type === 'EXCLUDED').length,
+    mechanizedRows: prefactura.filter((row) => row.contractorCode === CASUR_CONTRACTOR && MECHANIZED_SERVICES.has(row.service)).length,
+    unknownServices,
+    duplicateGroups: countDuplicateGroups(prefactura),
     coverage: {
-      payrollRows: l.length,
-      prefacturaRows: n.length,
-      producerPayrollRows: l.length,
-      startWeek: Math.min(...D),
-      endWeek: Math.max(...D),
+      payrollRows: payroll.length,
+      prefacturaRows: prefactura.length,
+      producerPayrollRows: payroll.length,
+      startWeek: Math.min(...weeks),
+      endWeek: Math.max(...weeks),
     },
   };
 };

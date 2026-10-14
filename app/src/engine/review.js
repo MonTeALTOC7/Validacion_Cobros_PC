@@ -1,248 +1,7 @@
+// Revisión por Correo: valida un reporte de cobros recibido (CS9999) contra la Nómina del período solicitado.
 import { DIRECT_SERVICES, TPS_STAGE_SERVICES } from './constants';
 import { hashId, lotKey, round, sumBy, withinTolerance } from './normalize';
 
-const reviewKey = (a) => [a.week, a.hacienda, a.suerte, a.labor].join('|');
-const parseReviewKey = (a) => {
-  const [s, t, n, i] = a.split('|');
-  return {
-    week: Number(s),
-    hacienda: t,
-    suerte: n,
-    labor: i,
-  };
-};
-const reviewTolerance = (a) => 0.01;
-export const isReviewComparable = (a) =>
-  a.payrollUnits > 0 &&
-  a.reviewUnits > 0 &&
-  ['CORRECTO', 'COBRO_EXCESO', 'TOTAL_INCORRECTO'].includes(a.status);
-const reviewStatus = (a, s, t) =>
-  withinTolerance(a, s, reviewTolerance(t))
-    ? {
-        status: 'CORRECTO',
-        severity: 'ok',
-      }
-    : a > 0 && s === 0
-      ? {
-          status: 'FALTA_COBRO',
-          severity: 'critical',
-        }
-      : a === 0 && s > 0
-        ? {
-            status: 'COBRO_SIN_NOMINA',
-            severity: 'warning',
-          }
-        : s < a
-          ? {
-              status: 'COBRO_PARCIAL',
-              severity: 'critical',
-            }
-          : {
-              status: 'COBRO_EXCESO',
-              severity: 'info',
-            };
-const groupPayrollForReview = (a) => {
-  const s = new Map();
-  a.forEach((t) => {
-    const n = s.get(reviewKey(t)) ?? new Map();
-    const i = n.get(t.unit) ?? {
-      rows: [],
-      units: 0,
-    };
-    i.rows.push(t);
-    i.units += t.units;
-    n.set(t.unit, i);
-    s.set(reviewKey(t), n);
-  });
-  return s;
-};
-const groupReviewRows = (a) => {
-  const s = new Map();
-  a.forEach((t) => {
-    const n = s.get(reviewKey(t)) ?? new Map();
-    const i = n.get(t.unit) ?? {
-      rows: [],
-      units: 0,
-      total: 0,
-    };
-    i.rows.push(t);
-    i.units += t.units;
-    i.total += t.total;
-    n.set(t.unit, i);
-    s.set(reviewKey(t), n);
-  });
-  return s;
-};
-const buildReviewFinding = (a, s, t, n) => {
-  var f;
-  const i = parseReviewKey(a);
-  const r = round((t == null ? undefined : t.units) ?? 0);
-  const l = round((n == null ? undefined : n.units) ?? 0);
-  let { status: o, severity: x } = reviewStatus(r, l, s);
-  let m = `Nómina ${r} ${s}; archivo recibido ${l} ${s}.`;
-  if (n != null && n.rows.length) {
-    const S = round(
-      sumBy(n.rows, (E) => E.tariff * E.units),
-      2,
-    );
-    const A = round(n.total, 2);
-    o === 'CORRECTO' &&
-      !withinTolerance(S, A, 0.02) &&
-      ((o = 'TOTAL_INCORRECTO'),
-      (x = 'warning'),
-      (m += ` El total informado ${A} no coincide con tarifa × unidades ${S}.`));
-  }
-  return {
-    id: hashId('review-finding', a, s),
-    status: o,
-    severity: x,
-    ...i,
-    services: [...new Set((t == null ? undefined : t.rows.map((S) => S.service)) ?? [])],
-    serviceNames: [
-      ...new Set(
-        [
-          ...((t == null ? undefined : t.rows.map((S) => S.serviceName)) ?? []),
-          ...((n == null ? undefined : n.rows.map((S) => S.serviceName)) ?? []),
-        ].filter(Boolean),
-      ),
-    ],
-    unit: s,
-    reviewUnit: s,
-    payrollUnits: r,
-    reviewUnits: l,
-    difference: round(l - r),
-    tariff: ((f = n == null ? undefined : n.rows[0]) == null ? undefined : f.tariff) ?? 0,
-    total: round((n == null ? undefined : n.total) ?? 0, 2),
-    explanation: m,
-    payrollRowIds: (t == null ? undefined : t.rows.map((S) => S.id)) ?? [],
-    reviewRowIds: (n == null ? undefined : n.rows.map((S) => S.id)) ?? [],
-  };
-};
-const buildReviewSpecialFinding = (a, s, t) => ({
-  id: hashId('review-special', s, a.id),
-  status: s,
-  severity: 'warning',
-  week: a.week,
-  hacienda: a.hacienda,
-  suerte: a.suerte,
-  labor: a.labor,
-  services: [],
-  serviceNames: a.serviceName ? [a.serviceName] : [],
-  unit: a.unit,
-  reviewUnit: a.unit,
-  payrollUnits: 0,
-  reviewUnits: a.units,
-  difference: a.units,
-  tariff: a.tariff,
-  total: a.total,
-  explanation: t,
-  payrollRowIds: [],
-  reviewRowIds: [a.id],
-});
-export const runReview = (a, s, t, n) => {
-  var g;
-  const i = new Set(s.map((d) => d.year));
-  const r = new Set(a.master.filter((d) => d.producerScope).map((d) => lotKey(d.hacienda, d.suerte)));
-  const l = new Set(a.master.filter((d) => d.producerScope).map((d) => d.hacienda));
-  const o = new Set(s.map((d) => lotKey(d.hacienda, d.suerte)));
-  const x = new Set(s.map((d) => d.hacienda));
-  const m = new Set([...DIRECT_SERVICES, ...TPS_STAGE_SERVICES]);
-  const f = a.payroll.filter(
-    (d) =>
-      d.week >= t &&
-      d.week <= n &&
-      i.has(Number(d.date.slice(0, 4))) &&
-      m.has(d.service) &&
-      (r.has(lotKey(d.hacienda, d.suerte)) ||
-        l.has(d.hacienda) ||
-        o.has(lotKey(d.hacienda, d.suerte)) ||
-        x.has(d.hacienda)),
-  );
-  const S = s.filter((d) => d.week < t || d.week > n);
-  const A = s.filter((d) => d.week >= t && d.week <= n && d.contractorCode !== 'CS9999');
-  const E = s.filter((d) => d.week >= t && d.week <= n && d.contractorCode === 'CS9999');
-  const D = groupPayrollForReview(f);
-  const I = groupReviewRows(E);
-  const v = [];
-  for (const d of new Set([...D.keys(), ...I.keys()])) {
-    const R = D.get(d) ?? new Map();
-    const O = I.get(d) ?? new Map();
-    const C = new Set([...R.keys()].filter((P) => O.has(P)));
-    C.forEach((P) => v.push(buildReviewFinding(d, P, R.get(P), O.get(P))));
-    const y = [...R.entries()].filter(([P]) => !C.has(P));
-    const _ = [...O.entries()].filter(([P]) => !C.has(P));
-    if (y.length === 1 && _.length === 1) {
-      const [P, h] = y[0];
-      const [L, F] = _[0];
-      const j = parseReviewKey(d);
-      v.push({
-        id: hashId('review-unit', d),
-        status: 'UNIDAD_DIFERENTE',
-        severity: 'warning',
-        ...j,
-        services: [...new Set(h.rows.map((w) => w.service))],
-        serviceNames: [
-          ...new Set(
-            [...h.rows.map((w) => w.serviceName), ...F.rows.map((w) => w.serviceName)].filter(Boolean),
-          ),
-        ],
-        unit: P,
-        reviewUnit: L,
-        payrollUnits: round(h.units),
-        reviewUnits: round(F.units),
-        difference: round(F.units - h.units),
-        tariff: ((g = F.rows[0]) == null ? undefined : g.tariff) ?? 0,
-        total: round(F.total, 2),
-        explanation: `Las cantidades se compararon, pero Nómina usa ${P} y el archivo recibido usa ${L}.`,
-        payrollRowIds: h.rows.map((w) => w.id),
-        reviewRowIds: F.rows.map((w) => w.id),
-      });
-    } else {
-      y.forEach(([P, h]) => v.push(buildReviewFinding(d, P, h, undefined)));
-      _.forEach(([P, h]) => v.push(buildReviewFinding(d, P, undefined, h)));
-    }
-  }
-  S.forEach((d) =>
-    v.push(
-      buildReviewSpecialFinding(
-        d,
-        'FUERA_PERIODO',
-        `El correo solicita semanas ${t}–${n}, pero esta fila pertenece a la semana ${d.week}.`,
-      ),
-    ),
-  );
-  A.forEach((d) =>
-    v.push(
-      buildReviewSpecialFinding(
-        d,
-        'CONTRATISTA_NO_ESPERADO',
-        `El prestador ${d.contractorCode || d.contractor} no corresponde a CS9999.`,
-      ),
-    ),
-  );
-  v.sort(
-    (d, R) => d.week - R.week || d.hacienda.localeCompare(R.hacienda) || d.suerte.localeCompare(R.suerte),
-  );
-  const N = s.map((d) => d.week);
-  return {
-    generatedAt: new Date().toISOString(),
-    requestedWeekStart: t,
-    requestedWeekEnd: n,
-    fileWeekStart: Math.min(...N),
-    fileWeekEnd: Math.max(...N),
-    findings: v,
-    reviewRows: s.length,
-    total: round(
-      sumBy(s, (d) => d.total),
-      2,
-    ),
-    exact: v.filter((d) => d.status === 'CORRECTO').length,
-    critical: v.filter((d) => d.severity === 'critical').length,
-    warnings: v.filter((d) => d.severity === 'warning' || d.severity === 'info').length,
-    outsidePeriodRows: S.length,
-    unexpectedContractorRows: A.length,
-  };
-};
 export const REVIEW_STATUS_LABELS = {
   CORRECTO: 'Cobro correcto',
   FALTA_COBRO: 'Falta en archivo',
@@ -254,3 +13,211 @@ export const REVIEW_STATUS_LABELS = {
   FUERA_PERIODO: 'Fuera del período',
   CONTRATISTA_NO_ESPERADO: 'Prestador inesperado',
 };
+
+/** Clave de comparación de la revisión: semana|hacienda|suerte|labor (la UM se compara aparte). */
+export const reviewKey = (row) => [row.week, row.hacienda, row.suerte, row.labor].join('|');
+
+export const parseReviewKey = (key) => {
+  const [week, hacienda, suerte, labor] = key.split('|');
+  return { week: Number(week), hacienda, suerte, labor };
+};
+
+/** Tolerancia de unidades de la revisión (fija, heredada de v0.7). */
+export const reviewTolerance = () => 0.01;
+
+export const isReviewComparable = (finding) =>
+  finding.payrollUnits > 0 && finding.reviewUnits > 0 && ['CORRECTO', 'COBRO_EXCESO', 'TOTAL_INCORRECTO'].includes(finding.status);
+
+export const reviewStatus = (payrollUnits, reviewUnits, unit) => {
+  if (withinTolerance(payrollUnits, reviewUnits, reviewTolerance(unit))) return { status: 'CORRECTO', severity: 'ok' };
+  if (payrollUnits > 0 && reviewUnits === 0) return { status: 'FALTA_COBRO', severity: 'critical' };
+  if (payrollUnits === 0 && reviewUnits > 0) return { status: 'COBRO_SIN_NOMINA', severity: 'warning' };
+  if (reviewUnits < payrollUnits) return { status: 'COBRO_PARCIAL', severity: 'critical' };
+  return { status: 'COBRO_EXCESO', severity: 'info' };
+};
+
+/** Agrupa filas por clave de revisión y, dentro de ella, por UM. */
+const groupByKeyAndUnit = (rows, withTotal) => {
+  const groups = new Map();
+  rows.forEach((row) => {
+    const byUnit = groups.get(reviewKey(row)) ?? new Map();
+    const group = byUnit.get(row.unit) ?? (withTotal ? { rows: [], units: 0, total: 0 } : { rows: [], units: 0 });
+    group.rows.push(row);
+    group.units += row.units;
+    if (withTotal) group.total += row.total;
+    byUnit.set(row.unit, group);
+    groups.set(reviewKey(row), byUnit);
+  });
+  return groups;
+};
+export const groupPayrollForReview = (rows) => groupByKeyAndUnit(rows, false);
+export const groupReviewRows = (rows) => groupByKeyAndUnit(rows, true);
+
+export const buildReviewFinding = (key, unit, payrollGroup, reviewGroup) => {
+  const parts = parseReviewKey(key);
+  const payrollUnits = round(payrollGroup?.units ?? 0);
+  const reviewUnits = round(reviewGroup?.units ?? 0);
+  let { status, severity } = reviewStatus(payrollUnits, reviewUnits, unit);
+  let explanation = `Nómina ${payrollUnits} ${unit}; archivo recibido ${reviewUnits} ${unit}.`;
+  if (reviewGroup?.rows.length) {
+    const expectedTotal = round(
+      sumBy(reviewGroup.rows, (row) => row.tariff * row.units),
+      2,
+    );
+    const reportedTotal = round(reviewGroup.total, 2);
+    if (status === 'CORRECTO' && !withinTolerance(expectedTotal, reportedTotal, 0.02)) {
+      status = 'TOTAL_INCORRECTO';
+      severity = 'warning';
+      explanation += ` El total informado ${reportedTotal} no coincide con tarifa × unidades ${expectedTotal}.`;
+    }
+  }
+  return {
+    id: hashId('review-finding', key, unit),
+    status,
+    severity,
+    ...parts,
+    services: [...new Set(payrollGroup?.rows.map((row) => row.service) ?? [])],
+    serviceNames: [
+      ...new Set(
+        [...(payrollGroup?.rows.map((row) => row.serviceName) ?? []), ...(reviewGroup?.rows.map((row) => row.serviceName) ?? [])].filter(
+          Boolean,
+        ),
+      ),
+    ],
+    unit,
+    reviewUnit: unit,
+    payrollUnits,
+    reviewUnits,
+    difference: round(reviewUnits - payrollUnits),
+    tariff: reviewGroup?.rows[0]?.tariff ?? 0,
+    total: round(reviewGroup?.total ?? 0, 2),
+    explanation,
+    payrollRowIds: payrollGroup?.rows.map((row) => row.id) ?? [],
+    reviewRowIds: reviewGroup?.rows.map((row) => row.id) ?? [],
+  };
+};
+
+export const buildReviewSpecialFinding = (row, status, explanation) => ({
+  id: hashId('review-special', status, row.id),
+  status,
+  severity: 'warning',
+  week: row.week,
+  hacienda: row.hacienda,
+  suerte: row.suerte,
+  labor: row.labor,
+  services: [],
+  serviceNames: row.serviceName ? [row.serviceName] : [],
+  unit: row.unit,
+  reviewUnit: row.unit,
+  payrollUnits: 0,
+  reviewUnits: row.units,
+  difference: row.units,
+  tariff: row.tariff,
+  total: row.total,
+  explanation,
+  payrollRowIds: [],
+  reviewRowIds: [row.id],
+});
+
+/**
+ * Ejecuta la revisión de las semanas [weekStart, weekEnd] del archivo recibido.
+ * La Nómina se limita a servicios conciliables, al año del archivo y a los lotes/haciendas
+ * de productores (Maestro) o presentes en el archivo recibido.
+ */
+export const runReview = (inputs, reviewRows, weekStart, weekEnd) => {
+  const years = new Set(reviewRows.map((row) => row.year));
+  const producerLots = new Set(inputs.master.filter((row) => row.producerScope).map((row) => lotKey(row.hacienda, row.suerte)));
+  const producerHaciendas = new Set(inputs.master.filter((row) => row.producerScope).map((row) => row.hacienda));
+  const reviewLots = new Set(reviewRows.map((row) => lotKey(row.hacienda, row.suerte)));
+  const reviewHaciendas = new Set(reviewRows.map((row) => row.hacienda));
+  const reviewServices = new Set([...DIRECT_SERVICES, ...TPS_STAGE_SERVICES]);
+  const payroll = inputs.payroll.filter(
+    (row) =>
+      row.week >= weekStart &&
+      row.week <= weekEnd &&
+      years.has(reviewYearOf(row)) &&
+      reviewServices.has(row.service) &&
+      (producerLots.has(lotKey(row.hacienda, row.suerte)) ||
+        producerHaciendas.has(row.hacienda) ||
+        reviewLots.has(lotKey(row.hacienda, row.suerte)) ||
+        reviewHaciendas.has(row.hacienda)),
+  );
+  const outsidePeriod = reviewRows.filter((row) => row.week < weekStart || row.week > weekEnd);
+  const unexpectedContractor = reviewRows.filter((row) => row.week >= weekStart && row.week <= weekEnd && row.contractorCode !== 'CS9999');
+  const comparable = reviewRows.filter((row) => row.week >= weekStart && row.week <= weekEnd && row.contractorCode === 'CS9999');
+  const payrollGroups = groupPayrollForReview(payroll);
+  const reviewGroups = groupReviewRows(comparable);
+  const findings = [];
+  for (const key of new Set([...payrollGroups.keys(), ...reviewGroups.keys()])) {
+    const payrollByUnit = payrollGroups.get(key) ?? new Map();
+    const reviewByUnit = reviewGroups.get(key) ?? new Map();
+    const sharedUnits = new Set([...payrollByUnit.keys()].filter((unit) => reviewByUnit.has(unit)));
+    sharedUnits.forEach((unit) => findings.push(buildReviewFinding(key, unit, payrollByUnit.get(unit), reviewByUnit.get(unit))));
+    const payrollOnly = [...payrollByUnit.entries()].filter(([unit]) => !sharedUnits.has(unit));
+    const reviewOnly = [...reviewByUnit.entries()].filter(([unit]) => !sharedUnits.has(unit));
+    if (payrollOnly.length === 1 && reviewOnly.length === 1) {
+      const [payrollUnit, payrollGroup] = payrollOnly[0];
+      const [reviewUnit, reviewGroup] = reviewOnly[0];
+      findings.push({
+        id: hashId('review-unit', key),
+        status: 'UNIDAD_DIFERENTE',
+        severity: 'warning',
+        ...parseReviewKey(key),
+        services: [...new Set(payrollGroup.rows.map((row) => row.service))],
+        serviceNames: [
+          ...new Set([...payrollGroup.rows.map((row) => row.serviceName), ...reviewGroup.rows.map((row) => row.serviceName)].filter(Boolean)),
+        ],
+        unit: payrollUnit,
+        reviewUnit,
+        payrollUnits: round(payrollGroup.units),
+        reviewUnits: round(reviewGroup.units),
+        difference: round(reviewGroup.units - payrollGroup.units),
+        tariff: reviewGroup.rows[0]?.tariff ?? 0,
+        total: round(reviewGroup.total, 2),
+        explanation: `Las cantidades se compararon, pero Nómina usa ${payrollUnit} y el archivo recibido usa ${reviewUnit}.`,
+        payrollRowIds: payrollGroup.rows.map((row) => row.id),
+        reviewRowIds: reviewGroup.rows.map((row) => row.id),
+      });
+    } else {
+      payrollOnly.forEach(([unit, group]) => findings.push(buildReviewFinding(key, unit, group, undefined)));
+      reviewOnly.forEach(([unit, group]) => findings.push(buildReviewFinding(key, unit, undefined, group)));
+    }
+  }
+  outsidePeriod.forEach((row) =>
+    findings.push(
+      buildReviewSpecialFinding(
+        row,
+        'FUERA_PERIODO',
+        `El correo solicita semanas ${weekStart}–${weekEnd}, pero esta fila pertenece a la semana ${row.week}.`,
+      ),
+    ),
+  );
+  unexpectedContractor.forEach((row) =>
+    findings.push(
+      buildReviewSpecialFinding(row, 'CONTRATISTA_NO_ESPERADO', `El prestador ${row.contractorCode || row.contractor} no corresponde a CS9999.`),
+    ),
+  );
+  findings.sort((a, b) => a.week - b.week || a.hacienda.localeCompare(b.hacienda) || a.suerte.localeCompare(b.suerte));
+  const weeks = reviewRows.map((row) => row.week);
+  return {
+    generatedAt: new Date().toISOString(),
+    requestedWeekStart: weekStart,
+    requestedWeekEnd: weekEnd,
+    fileWeekStart: Math.min(...weeks),
+    fileWeekEnd: Math.max(...weeks),
+    findings,
+    reviewRows: reviewRows.length,
+    total: round(
+      sumBy(reviewRows, (row) => row.total),
+      2,
+    ),
+    exact: findings.filter((f) => f.status === 'CORRECTO').length,
+    critical: findings.filter((f) => f.severity === 'critical').length,
+    warnings: findings.filter((f) => f.severity === 'warning' || f.severity === 'info').length,
+    outsidePeriodRows: outsidePeriod.length,
+    unexpectedContractorRows: unexpectedContractor.length,
+  };
+};
+
+/** Año con el que se compara una fila de Nómina contra el AÑO del reporte recibido. */
+const reviewYearOf = (row) => Number(row.date.slice(0, 4));

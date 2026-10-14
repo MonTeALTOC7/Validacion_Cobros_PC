@@ -1,135 +1,130 @@
+// Seguimiento de labores: universo de trabajo realizado (Nómina + mecanizadas de Prefactura).
 import { DIRECT_SERVICES, MECHANIZED_SERVICES, TPS_STAGE_SERVICES } from './constants';
 import { lotKey, normalizeText } from './normalize';
 
-const computeAge = (a, s) => {
-  if (!a)
-    return {
-      ageDays: null,
-      ageBase: '',
-      ageNote: 'Sin maestro exacto de la suerte',
-    };
-  const t = [a.plantingDate, a.lastCutDate]
-    .filter((i) => !!i && /^\d{4}-\d{2}-\d{2}$/.test(i) && i >= '1900-01-01')
+/** Edad del cultivo en la fecha de la labor, desde la fecha más reciente (siembra/corte) no posterior a ella. */
+export const computeAge = (masterRow, date) => {
+  if (!masterRow) return { ageDays: null, ageBase: '', ageNote: 'Sin maestro exacto de la suerte' };
+  const base = [masterRow.plantingDate, masterRow.lastCutDate]
+    .filter((value) => !!value && /^\d{4}-\d{2}-\d{2}$/.test(value) && value >= '1900-01-01')
     .sort()
     .at(-1);
-  if (!t)
-    return {
-      ageDays: null,
-      ageBase: '',
-      ageNote: 'Faltan fechas de siembra/corte; recargue el maestro para incorporarlas',
-    };
-  if (t > s)
-    return {
-      ageDays: null,
-      ageBase: t,
-      ageNote: 'Labor anterior al ciclo del maestro; falta historial de cortes',
-    };
-  const n = Math.floor((Date.parse(s) - Date.parse(t)) / 864e5);
+  if (!base) {
+    return { ageDays: null, ageBase: '', ageNote: 'Faltan fechas de siembra/corte; recargue el maestro para incorporarlas' };
+  }
+  if (base > date) {
+    return { ageDays: null, ageBase: base, ageNote: 'Labor anterior al ciclo del maestro; falta historial de cortes' };
+  }
+  const days = Math.floor((Date.parse(date) - Date.parse(base)) / 864e5);
   return {
-    ageDays: Number.isFinite(n) ? n : null,
-    ageBase: t,
-    ageNote: t === a.lastCutDate ? 'Desde último corte del maestro' : 'Desde siembra del maestro',
+    ageDays: Number.isFinite(days) ? days : null,
+    ageBase: base,
+    ageNote: base === masterRow.lastCutDate ? 'Desde último corte del maestro' : 'Desde siembra del maestro',
   };
 };
-export const ageBucket = (a) =>
-  a === null
-    ? 'Sin edad'
-    : a <= 30
-      ? '0–30 días'
-      : a <= 60
-        ? '31–60 días'
-        : a <= 90
-          ? '61–90 días'
-          : a <= 120
-            ? '91–120 días'
-            : 'Más de 120 días';
-export const laborUnitKey = (a) => JSON.stringify([a.labor, a.unit]);
-export const sumUnits = (a) => a.reduce((s, t) => s + t.units, 0);
-export const laborDisplayName = (a) =>
-  ({
-    CQM: 'Control químico de maleza',
-    CMN: 'Control manual de maleza',
-    GCO: 'Riego por gravedad',
-    ZGC: 'Preparación de riego',
-    ECR: 'Resiembra · regada y tapada',
-    RYA: 'Regada, acomodada y tapada',
-    MAN: 'Fertilización manual',
-    IAP: 'Riego pivote',
-    GOT: 'Riego por goteo',
-    VIG: 'Vigilancia',
-  })[a.labor] ||
-  a.name ||
-  a.labor;
-export const buildTrackingRows = (a, s) => {
-  const t = buildActivityRows(a, s);
-  const n = (r) => [r.week, r.hacienda, r.suerte, r.labor, r.service, r.unit].join('|');
-  const i = new Set(t.filter((r) => r.source === 'Nómina').map(n));
-  return t.filter((r) => r.source === 'Nómina' || (r.classification === 'Mecanizada' && !i.has(n(r))));
+
+export const ageBucket = (days) => {
+  if (days === null) return 'Sin edad';
+  if (days <= 30) return '0–30 días';
+  if (days <= 60) return '31–60 días';
+  if (days <= 90) return '61–90 días';
+  if (days <= 120) return '91–120 días';
+  return 'Más de 120 días';
 };
-function buildActivityRows(a, s) {
-  const t = new Map();
-  a.master.forEach((o) => {
-    const x = lotKey(o.hacienda, o.suerte);
-    (!t.has(x) || o.producerScope) && t.set(x, o);
+
+export const laborUnitKey = (row) => JSON.stringify([row.labor, row.unit]);
+
+export const sumUnits = (rows) => rows.reduce((total, row) => total + row.units, 0);
+
+const LABOR_NAMES = {
+  CQM: 'Control químico de maleza',
+  CMN: 'Control manual de maleza',
+  GCO: 'Riego por gravedad',
+  ZGC: 'Preparación de riego',
+  ECR: 'Resiembra · regada y tapada',
+  RYA: 'Regada, acomodada y tapada',
+  MAN: 'Fertilización manual',
+  IAP: 'Riego pivote',
+  GOT: 'Riego por goteo',
+  VIG: 'Vigilancia',
+};
+export const laborDisplayName = (row) => LABOR_NAMES[row.labor] || row.name || row.labor;
+
+/**
+ * Seguimiento sin doble conteo: toda la Nómina, más las labores mecanizadas de Prefactura que no
+ * tengan una fila de Nómina con la misma semana/hacienda/suerte/labor/servicio/UM.
+ * Las manuales de Prefactura nunca se suman (la Nómina es la fuente primaria).
+ */
+export const buildTrackingRows = (inputs, startDate) => {
+  const rows = buildActivityRows(inputs, startDate);
+  const key = (row) => [row.week, row.hacienda, row.suerte, row.labor, row.service, row.unit].join('|');
+  const payrollKeys = new Set(rows.filter((row) => row.source === 'Nómina').map(key));
+  return rows.filter((row) => row.source === 'Nómina' || (row.classification === 'Mecanizada' && !payrollKeys.has(key(row))));
+};
+
+const classify = (row, manualServices) => {
+  if (row.labor === 'AAM') return 'AAM · separada';
+  if (row.labor === 'TPS') return 'Paquete TPS';
+  if (MECHANIZED_SERVICES.has(row.service)) return 'Mecanizada';
+  if (manualServices.has(row.service)) return 'Manual';
+  return 'Sin clasificar';
+};
+
+/** Filas de actividad de Nómina y Prefactura desde `startDate`, con productor, ámbito, clase y edad. */
+export function buildActivityRows(inputs, startDate) {
+  const masterByLot = new Map();
+  inputs.master.forEach((row) => {
+    const key = lotKey(row.hacienda, row.suerte);
+    if (!masterByLot.has(key) || row.producerScope) masterByLot.set(key, row);
   });
-  const n = new Map();
-  a.prefactura.forEach((o) => {
-    if (!o.producer.trim()) return;
-    const x = n.get(o.hacienda) ?? new Set();
-    x.add(normalizeText(o.producer));
-    n.set(o.hacienda, x);
+  const producersByHacienda = new Map();
+  inputs.prefactura.forEach((row) => {
+    if (!row.producer.trim()) return;
+    const set = producersByHacienda.get(row.hacienda) ?? new Set();
+    set.add(normalizeText(row.producer));
+    producersByHacienda.set(row.hacienda, set);
   });
-  const i = new Set(a.master.filter((o) => o.producerScope).map((o) => o.hacienda));
-  const r = new Set([...DIRECT_SERVICES, ...TPS_STAGE_SERVICES, ...a.payroll.map((o) => o.service)]);
-  const l = [];
-  for (const [o, x] of [
-    ['Nómina', a.payroll],
-    ['Prefactura', a.prefactura],
-  ])
-    for (const m of x) {
-      if (m.date < s) continue;
-      const f = t.get(lotKey(m.hacienda, m.suerte));
-      const S = n.get(m.hacienda);
-      const A = 'producer' in m ? normalizeText(m.producer) : '';
-      const E =
-        A || ((S == null ? undefined : S.size) === 1 ? [...S][0] : m.hacienda + ' · titular sin confirmar');
-      const D =
-        (f != null && f.producerScope) || i.has(m.hacienda) || A
+  const producerHaciendas = new Set(inputs.master.filter((row) => row.producerScope).map((row) => row.hacienda));
+  const manualServices = new Set([...DIRECT_SERVICES, ...TPS_STAGE_SERVICES, ...inputs.payroll.map((row) => row.service)]);
+  const activity = [];
+  for (const [source, rows] of [
+    ['Nómina', inputs.payroll],
+    ['Prefactura', inputs.prefactura],
+  ]) {
+    for (const row of rows) {
+      if (row.date < startDate) continue;
+      const master = masterByLot.get(lotKey(row.hacienda, row.suerte));
+      const known = producersByHacienda.get(row.hacienda);
+      const ownProducer = 'producer' in row ? normalizeText(row.producer) : '';
+      const producer = ownProducer || (known?.size === 1 ? [...known][0] : row.hacienda + ' · titular sin confirmar');
+      const scope =
+        master?.producerScope || producerHaciendas.has(row.hacienda) || ownProducer
           ? 'Productores'
-          : f
+          : master
             ? 'CASUR / otro ámbito'
             : 'Sin maestro · revisar';
-      const I =
-        m.labor === 'AAM'
-          ? 'AAM · separada'
-          : m.labor === 'TPS'
-            ? 'Paquete TPS'
-            : MECHANIZED_SERVICES.has(m.service)
-              ? 'Mecanizada'
-              : r.has(m.service)
-                ? 'Manual'
-                : 'Sin clasificar';
-      l.push({
-        id: o + ':' + m.id,
-        source: o,
-        sourceRow: m.sourceRow,
-        date: m.date,
-        week: m.week,
-        producer: E,
-        hacienda: m.hacienda,
-        suerte: m.suerte,
-        labor: m.labor,
-        service: m.service,
-        name: m.serviceName || m.laborName,
-        unit: m.unit,
-        units: m.units,
-        amount: 'total' in m ? m.total : 0,
-        pFact: 'pFact' in m ? m.pFact : '',
-        contractor: 'contractorCode' in m ? m.contractorCode : 'CS9999',
-        classification: I,
-        scope: D,
-        ...computeAge(f, m.date),
+      activity.push({
+        id: source + ':' + row.id,
+        source,
+        sourceRow: row.sourceRow,
+        date: row.date,
+        week: row.week,
+        producer,
+        hacienda: row.hacienda,
+        suerte: row.suerte,
+        labor: row.labor,
+        service: row.service,
+        name: row.serviceName || row.laborName,
+        unit: row.unit,
+        units: row.units,
+        amount: 'total' in row ? row.total : 0,
+        pFact: 'pFact' in row ? row.pFact : '',
+        contractor: 'contractorCode' in row ? row.contractorCode : 'CS9999',
+        classification: classify(row, manualServices),
+        scope,
+        ...computeAge(master, row.date),
       });
     }
-  return l;
+  }
+  return activity;
 }

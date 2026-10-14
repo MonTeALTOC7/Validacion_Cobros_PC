@@ -1,25 +1,26 @@
+// Aplicaciones estimadas por suerte: agrupa ejecuciones por fechas cercanas y las compara con el área
+// del Maestro. Es una estimación orientativa: HA de labor es trabajo acumulado, no superficie física.
 import { lotKey } from './normalize';
 
-const DEFAULT_APPLICATION_RULE = {
-  gapDays: 7,
-  maxDays: 14,
-  repeatDays: 3,
-  tolerancePct: 5,
-};
-export const ruleKey = (a) => JSON.stringify([a.labor, a.service]);
-export const isValidRule = (a) =>
-  Number.isInteger(a.gapDays) &&
-  a.gapDays >= 1 &&
-  a.gapDays <= 90 &&
-  Number.isInteger(a.maxDays) &&
-  a.maxDays >= a.gapDays &&
-  a.maxDays <= 180 &&
-  Number.isInteger(a.repeatDays) &&
-  a.repeatDays >= 1 &&
-  a.repeatDays <= a.maxDays &&
-  Number.isFinite(a.tolerancePct) &&
-  a.tolerancePct >= 0 &&
-  a.tolerancePct <= 20;
+export const DEFAULT_APPLICATION_RULE = { gapDays: 7, maxDays: 14, repeatDays: 3, tolerancePct: 5 };
+export const APPLICATION_RULES_STORAGE_KEY = 'casur-application-rules-v1';
+
+export const ruleKey = (row) => JSON.stringify([row.labor, row.service]);
+
+export const isValidRule = (rule) =>
+  Number.isInteger(rule.gapDays) &&
+  rule.gapDays >= 1 &&
+  rule.gapDays <= 90 &&
+  Number.isInteger(rule.maxDays) &&
+  rule.maxDays >= rule.gapDays &&
+  rule.maxDays <= 180 &&
+  Number.isInteger(rule.repeatDays) &&
+  rule.repeatDays >= 1 &&
+  rule.repeatDays <= rule.maxDays &&
+  Number.isFinite(rule.tolerancePct) &&
+  rule.tolerancePct >= 0 &&
+  rule.tolerancePct <= 20;
+
 export const APPLICATION_STATUS_LABELS = {
   COMPLETA: 'Área completa estimada',
   PARCIAL: 'Área parcial',
@@ -28,160 +29,139 @@ export const APPLICATION_STATUS_LABELS = {
   NO_HA: 'Jornada · sin equivalencia HA',
   REVISAR: 'Datos por revisar',
 };
-const dateToDayNumber = (a) => {
-  const s = Date.parse(a);
-  return /^\d{4}-\d{2}-\d{2}$/.test(a) && Number.isFinite(s) && new Date(s).toISOString().slice(0, 10) === a
-    ? s / 864e5
+
+/** Número de día (desde 1970) de una fecha ISO válida; NaN si no es válida. */
+export const dateToDayNumber = (iso) => {
+  const time = Date.parse(iso);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) && Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === iso
+    ? time / 864e5
     : NaN;
 };
+
+/** Reglas guardadas en este dispositivo (localStorage), validadas; si no hay o son inválidas, las de fábrica. */
 export const loadApplicationRules = () => {
-  const a = {
-    base: {
-      ...DEFAULT_APPLICATION_RULE,
-    },
-    overrides: {},
-  };
+  const fallback = { base: { ...DEFAULT_APPLICATION_RULE }, overrides: {} };
   try {
-    const s = JSON.parse(localStorage.getItem('casur-application-rules-v1') ?? 'null');
-    return !s || !isValidRule(s.base) || !s.overrides
-      ? a
-      : {
-          base: s.base,
-          overrides: Object.fromEntries(Object.entries(s.overrides).filter(([, t]) => isValidRule(t))),
-        };
+    const stored = JSON.parse(localStorage.getItem(APPLICATION_RULES_STORAGE_KEY) ?? 'null');
+    if (!stored || !isValidRule(stored.base) || !stored.overrides) return fallback;
+    return {
+      base: stored.base,
+      overrides: Object.fromEntries(Object.entries(stored.overrides).filter(([, rule]) => isValidRule(rule))),
+    };
   } catch {
-    return a;
+    return fallback;
   }
 };
-export function buildApplicationEpisodes(a, s, t) {
-  const n = new Map();
-  s.forEach((l) => {
-    const o = lotKey(l.hacienda, l.suerte);
-    n.set(o, [...(n.get(o) ?? []), l]);
+
+const EPSILON = 1e-9;
+
+export function buildApplicationEpisodes(rows, master, rules) {
+  const masterByLot = new Map();
+  master.forEach((row) => {
+    const key = lotKey(row.hacienda, row.suerte);
+    masterByLot.set(key, [...(masterByLot.get(key) ?? []), row]);
   });
-  const i = new Map();
-  a.forEach((l) => {
-    const o = JSON.stringify([l.hacienda, l.suerte, l.labor, l.service, l.unit, l.source]);
-    i.set(o, [...(i.get(o) ?? []), l]);
+  const series = new Map();
+  rows.forEach((row) => {
+    const key = JSON.stringify([row.hacienda, row.suerte, row.labor, row.service, row.unit, row.source]);
+    series.set(key, [...(series.get(key) ?? []), row]);
   });
-  const r = [];
-  for (const [l, o] of i) {
-    o.sort((O, C) => O.date.localeCompare(C.date) || O.id.localeCompare(C.id));
-    const x = o[0];
-    const m = n.get(lotKey(x.hacienda, x.suerte)) ?? [];
-    const f = [
-      ...new Set(m.map((O) => O.area).filter((O) => typeof O == 'number' && Number.isFinite(O) && O > 0)),
-    ];
-    const S = f.length === 1 ? f[0] : null;
-    const A = t.overrides[ruleKey(x)] ?? t.base;
-    const E = isValidRule(A)
-      ? {
-          ...A,
-        }
-      : {
-          ...DEFAULT_APPLICATION_RULE,
-        };
-    const D = [
+  const episodes = [];
+  for (const [seriesKey, list] of series) {
+    list.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+    const first = list[0];
+    const masterRows = masterByLot.get(lotKey(first.hacienda, first.suerte)) ?? [];
+    const areas = [...new Set(masterRows.map((row) => row.area).filter((area) => typeof area === 'number' && Number.isFinite(area) && area > 0))];
+    const area = areas.length === 1 ? areas[0] : null;
+    const candidate = rules.overrides[ruleKey(first)] ?? rules.base;
+    const rule = isValidRule(candidate) ? { ...candidate } : { ...DEFAULT_APPLICATION_RULE };
+    const cycleDates = [
       ...new Set(
-        m
-          .flatMap((O) => [O.plantingDate, O.lastCutDate])
-          .filter((O) => !!O && Number.isFinite(dateToDayNumber(O))),
+        masterRows.flatMap((row) => [row.plantingDate, row.lastCutDate]).filter((date) => !!date && Number.isFinite(dateToDayNumber(date))),
       ),
     ].sort();
-    const I = (O) => D.filter((C) => C <= O).at(-1) ?? '';
-    const v = new Map();
-    o.forEach((O) => v.set(O.date, [...(v.get(O.date) ?? []), O]));
-    let N = [];
-    let g = 0;
-    const d = (O) => O.reduce((C, y) => C + (Number.isFinite(y.units) ? y.units : 0), 0);
-    const R = () => {
-      if (!N.length) return;
-      const O = d(N);
-      const C = x.unit === 'HA';
-      const y = C && S ? O / S : null;
-      const _ = N.some(
-        (L) => !Number.isFinite(dateToDayNumber(L.date)) || !Number.isFinite(L.units) || L.units <= 0,
-      );
-      const P = _
-        ? 'REVISAR'
-        : C
-          ? S
-            ? y < 1 - E.tolerancePct / 100 - 1e-9
-              ? 'PARCIAL'
-              : y > 1 + E.tolerancePct / 100 + 1e-9
-                ? 'SOBREAREA'
-                : 'COMPLETA'
-            : 'SIN_AREA'
-          : 'NO_HA';
-      const h = ['Agrupación estimada por fechas; no demuestra cobertura física uniforme del lote.'];
-      S
-        ? h.push('Área de referencia del maestro cargado; no acredita el área histórica de cada ejecución.')
-        : h.push(
-            f.length > 1
-              ? 'El maestro contiene áreas distintas para esta suerte. Actualice o aclare el maestro.'
-              : 'No hay área positiva de la suerte exacta; no se sustituye por el área de la hacienda.',
-          );
-      x.source === 'Prefactura' &&
-        h.push(
-          'Fechas de registro del reporte mecanizado: aplicaciones orientativas, ejecución no confirmada.',
+    const cycleOf = (date) => cycleDates.filter((cycleDate) => cycleDate <= date).at(-1) ?? '';
+    const byDate = new Map();
+    list.forEach((row) => byDate.set(row.date, [...(byDate.get(row.date) ?? []), row]));
+    let current = [];
+    let sequence = 0;
+    const quantityOf = (items) => items.reduce((total, row) => total + (Number.isFinite(row.units) ? row.units : 0), 0);
+    const close = () => {
+      if (!current.length) return;
+      const quantity = quantityOf(current);
+      const isHa = first.unit === 'HA';
+      const equivalent = isHa && area ? quantity / area : null;
+      const invalid = current.some((row) => !Number.isFinite(dateToDayNumber(row.date)) || !Number.isFinite(row.units) || row.units <= 0);
+      let status;
+      if (invalid) status = 'REVISAR';
+      else if (!isHa) status = 'NO_HA';
+      else if (!area) status = 'SIN_AREA';
+      else if (equivalent < 1 - rule.tolerancePct / 100 - EPSILON) status = 'PARCIAL';
+      else if (equivalent > 1 + rule.tolerancePct / 100 + EPSILON) status = 'SOBREAREA';
+      else status = 'COMPLETA';
+      const notes = ['Agrupación estimada por fechas; no demuestra cobertura física uniforme del lote.'];
+      if (area) notes.push('Área de referencia del maestro cargado; no acredita el área histórica de cada ejecución.');
+      else {
+        notes.push(
+          areas.length > 1
+            ? 'El maestro contiene áreas distintas para esta suerte. Actualice o aclare el maestro.'
+            : 'No hay área positiva de la suerte exacta; no se sustituye por el área de la hacienda.',
         );
-      P === 'SOBREAREA' &&
-        h.push(
-          'El exceso no se convierte automáticamente en dos o más aplicaciones. Revise las fechas y el detalle.',
-        );
-      P === 'NO_HA' &&
-        h.push(
+      }
+      if (first.source === 'Prefactura') {
+        notes.push('Fechas de registro del reporte mecanizado: aplicaciones orientativas, ejecución no confirmada.');
+      }
+      if (status === 'SOBREAREA') {
+        notes.push('El exceso no se convierte automáticamente en dos o más aplicaciones. Revise las fechas y el detalle.');
+      }
+      if (status === 'NO_HA') {
+        notes.push(
           'Se cuentan jornadas agrupadas, no aplicaciones completas: esta unidad no es convertible a hectáreas sin una regla validada.',
         );
-      _ &&
-        h.push(
-          'Hay cantidades nulas, negativas, no numéricas o fechas inválidas. Se conservan para revisión.',
-        );
-      r.push({
-        id: l + ':' + N[0].id,
-        sequence: ++g,
-        rows: N,
-        start: N[0].date,
-        end: N.at(-1).date,
-        area: S,
-        quantity: O,
-        equivalent: y,
-        status: P,
-        rule: E,
-        notes: h,
-      });
-      N = [];
-    };
-    for (const [O, C] of v) {
-      if (N.length) {
-        const y = dateToDayNumber(O) - dateToDayNumber(N.at(-1).date);
-        const _ = dateToDayNumber(O) - dateToDayNumber(N[0].date);
-        const P = x.unit === 'HA' && S !== null && d(N) >= S * (1 - E.tolerancePct / 100) - 1e-9;
-        (!Number.isFinite(y) ||
-          y > E.gapDays ||
-          _ >= E.maxDays ||
-          I(O) !== I(N[0].date) ||
-          (P && y >= E.repeatDays)) &&
-          R();
       }
-      N.push(...C);
+      if (invalid) notes.push('Hay cantidades nulas, negativas, no numéricas o fechas inválidas. Se conservan para revisión.');
+      episodes.push({
+        id: seriesKey + ':' + current[0].id,
+        sequence: ++sequence,
+        rows: current,
+        start: current[0].date,
+        end: current.at(-1).date,
+        area,
+        quantity,
+        equivalent,
+        status,
+        rule,
+        notes,
+      });
+      current = [];
+    };
+    for (const [date, sameDay] of byDate) {
+      if (current.length) {
+        const gap = dateToDayNumber(date) - dateToDayNumber(current.at(-1).date);
+        const span = dateToDayNumber(date) - dateToDayNumber(current[0].date);
+        const areaReached = first.unit === 'HA' && area !== null && quantityOf(current) >= area * (1 - rule.tolerancePct / 100) - EPSILON;
+        if (
+          !Number.isFinite(gap) ||
+          gap > rule.gapDays ||
+          span >= rule.maxDays ||
+          cycleOf(date) !== cycleOf(current[0].date) ||
+          (areaReached && gap >= rule.repeatDays)
+        ) {
+          close();
+        }
+      }
+      current.push(...sameDay);
     }
-    R();
+    close();
   }
-  return r.sort((l, o) => o.start.localeCompare(l.start) || l.id.localeCompare(o.id));
+  return episodes.sort((a, b) => b.start.localeCompare(a.start) || a.id.localeCompare(b.id));
 }
-export const clipEpisodesToRows = (a, s) => {
-  const t = new Set(s.map((n) => n.id));
-  return a.flatMap((n) => {
-    const i = n.rows.filter((r) => t.has(r.id));
-    return i.length
-      ? [
-          {
-            ...n,
-            visible: i,
-            clipped: i.length !== n.rows.length,
-          },
-        ]
-      : [];
+
+/** Episodios recortados a las filas visibles (filtros activos). */
+export const clipEpisodesToRows = (episodes, rows) => {
+  const visibleIds = new Set(rows.map((row) => row.id));
+  return episodes.flatMap((episode) => {
+    const visible = episode.rows.filter((row) => visibleIds.has(row.id));
+    return visible.length ? [{ ...episode, visible, clipped: visible.length !== episode.rows.length }] : [];
   });
 };
