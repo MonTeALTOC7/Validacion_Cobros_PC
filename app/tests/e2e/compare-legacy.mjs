@@ -30,7 +30,11 @@ const VOLATILE = new Set(['generatedAt', 'importedAt', 'updatedAt', 'at', 'modif
 const strip = (v) => {
   if (Array.isArray(v)) return v.map(strip);
   if (v && typeof v === 'object') {
-    return Object.fromEntries(Object.entries(v).filter(([k]) => !VOLATILE.has(k)).map(([k, x]) => [k, strip(x)]));
+    return Object.fromEntries(
+      Object.entries(v)
+        .filter(([k]) => !VOLATILE.has(k))
+        .map(([k, x]) => [k, strip(x)]),
+    );
   }
   return v;
 };
@@ -80,11 +84,13 @@ try {
     datos,
     errors: { legacy: legacy.errors, next: next.errors },
     schema: { legacy: [legacy.db.version, legacy.db.stores], next: [next.db.version, next.db.stores] },
-    inputsEqual: JSON.stringify(strip(legacy.db.values.inputs)) === JSON.stringify(strip(next.db.values.inputs)),
-    analysisEqual: JSON.stringify(strip(la)) === JSON.stringify(strip(na)),
+    inputsEqual:
+      !!legacy.db.values.inputs &&
+      JSON.stringify(strip(legacy.db.values.inputs)) === JSON.stringify(strip(next.db.values.inputs)),
+    analysisEqual: !!la && JSON.stringify(strip(la)) === JSON.stringify(strip(na)),
     reviewEqual:
       JSON.stringify(strip(legacy.db.values['review-workspace'])) === JSON.stringify(strip(next.db.values['review-workspace'])),
-    findings: { legacy: la?.findings.length, next: na?.findings.length, ...diffFindings(la?.findings, na?.findings) },
+    findings: { legacyCount: la?.findings.length, nextCount: na?.findings.length, ...diffFindings(la?.findings, na?.findings) },
     tabs: Object.fromEntries(
       LEGACY_TABS.map((t) => [t, cleanText(legacy.texts[t]) === cleanText(next.texts[t]) ? 'igual' : 'DIFERENTE']),
     ),
@@ -98,11 +104,35 @@ try {
     tabDiffs[t] = { firstDifferentLine: i, legacy: a.slice(Math.max(0, i - 2), i + 4), next: b.slice(Math.max(0, i - 2), i + 4) };
   }
   report.tabDiffs = tabDiffs;
-  const summary = { ...report, findings: { ...report.findings, removed: report.findings.removed.length, added: report.findings.added.length, changed: report.findings.changed.length } };
+  const summary = {
+    ...report,
+    findings: {
+      ...report.findings,
+      removed: report.findings.removed.length,
+      added: report.findings.added.length,
+      changed: report.findings.changed.length,
+    },
+  };
   console.log(JSON.stringify(summary, null, 2));
+  const compact = (findings = []) =>
+    findings.map((f) => ({
+      key: [f.type, f.week, f.hacienda, f.suerte, f.labor, f.service, f.unit, f.type === 'DIRECT' ? '' : f.pFacts.join(',')].join(
+        '|',
+      ),
+      status: f.status,
+      payrollUnits: f.payrollUnits,
+      billedUnits: f.billedUnits,
+      flags: f.flags ?? [],
+      year: f.year,
+    }));
+  report.legacyFindings = compact(la?.findings);
+  report.nextFindings = compact(na?.findings);
   if (outFile) await writeFile(outFile, JSON.stringify(report, null, 2));
   const identical =
-    report.inputsEqual && report.analysisEqual && report.reviewEqual && Object.values(report.tabs).every((x) => x === 'igual') &&
+    report.inputsEqual &&
+    report.analysisEqual &&
+    report.reviewEqual &&
+    Object.values(report.tabs).every((x) => x === 'igual') &&
     !next.errors.length;
   if (!identical && !reportOnly) process.exitCode = 1;
 } finally {

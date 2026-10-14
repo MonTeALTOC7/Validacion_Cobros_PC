@@ -64,22 +64,27 @@ export async function openAndWait(browser, url, { viewport = { width: 1366, heig
     return route.continue();
   });
   await page.goto(url);
-  await page.waitForFunction(
-    () =>
-      new Promise((res) => {
-        const q = indexedDB.open('conciliador-casur');
-        q.onsuccess = () => {
-          const db = q.result;
-          if (!db.objectStoreNames.contains('values')) return res(false);
-          const g = db.transaction('values').objectStore('values').get('analysis');
-          g.onsuccess = () => res(!!g.result);
-          g.onerror = () => res(false);
-        };
-        q.onerror = () => res(false);
-      }),
-    null,
-    { timeout: 240000, polling: 1000 },
-  );
+  // Sondeo explícito: waitForFunction no espera de forma fiable a una promesa del predicado.
+  const hasAnalysis = () =>
+    page.evaluate(
+      () =>
+        new Promise((res) => {
+          const q = indexedDB.open('conciliador-casur');
+          q.onsuccess = () => {
+            const db = q.result;
+            if (!db.objectStoreNames.contains('values')) return res(false);
+            const g = db.transaction('values').objectStore('values').getAllKeys();
+            g.onsuccess = () => res(g.result.includes('analysis') && g.result.includes('inputs'));
+            g.onerror = () => res(false);
+          };
+          q.onerror = () => res(false);
+        }),
+    );
+  const deadline = Date.now() + 240000;
+  while (!(await hasAnalysis())) {
+    if (Date.now() > deadline) throw new Error('La aplicación no generó el análisis a tiempo: ' + url);
+    await page.waitForTimeout(500);
+  }
   await page.waitForTimeout(1500);
   return { context, page, errors };
 }
@@ -96,7 +101,13 @@ export async function readDb(page) {
         g.onsuccess = () => r(g.result);
       });
     const values = Object.fromEntries((await all('values')).map((v) => [v.key, v.value]));
-    return { version: db.version, stores: [...db.objectStoreNames], values, audit: await all('audit'), closures: await all('closures') };
+    return {
+      version: db.version,
+      stores: [...db.objectStoreNames],
+      values,
+      audit: await all('audit'),
+      closures: await all('closures'),
+    };
   });
 }
 
