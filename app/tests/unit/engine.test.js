@@ -11,6 +11,7 @@ import { runReconciliation } from '../../src/engine/reconciliation';
 import { DEFAULT_PARAMETERS } from '../../src/engine/constants';
 import { collectionState, coverageStats, isBlockingPending, weekSummaries } from '../../src/engine/indicators';
 import { buildTrackingRows } from '../../src/engine/tracking';
+import { PUBLISHED_FIELDS, buildPublishedTracking } from '../../src/engine/published';
 import { day, excelFile, masterRows, payrollRow, prefacturaRow } from './helpers';
 
 const load = async ({ payroll = [payrollRow()], prefactura = [prefacturaRow()], master = masterRows() } = {}) => {
@@ -173,6 +174,26 @@ describe('conciliación directa', () => {
     expect(rows.map((row) => row.period).sort()).toEqual(['2026-S10', '2027-S10']);
   });
 
+  it('seguimiento publicado para la App Maestra: mismos campos del bundle 8b2-1, sin montos ni P.FACT', async () => {
+    const inputs = await load({
+      payroll: [payrollRow({ Fecha: day('2026-03-02') }), payrollRow({ Fecha: day('2027-03-01') })],
+    });
+    const payload = buildPublishedTracking(inputs, '2026-01-01', '2026-10-14T00:00:00.000Z');
+    expect(payload).toMatchObject({
+      version: 1,
+      generatedAt: '2026-10-14T00:00:00.000Z',
+      count: 2,
+      maxWeek: 10,
+      maxPeriod: '2027-S10',
+    });
+    for (const row of payload.rows) {
+      expect(Object.keys(row)).toEqual(PUBLISHED_FIELDS);
+      expect(row).not.toHaveProperty('tariff');
+      expect(row).not.toHaveProperty('total');
+      expect(row).not.toHaveProperty('pFact');
+    }
+  });
+
   it('más de una labor en la misma suerte y semana se concilia por separado', async () => {
     const analysis = await run({
       payroll: [payrollRow(), payrollRow({ Labor: 'CQM', Servicio: '32019', Unidades: 1 })],
@@ -314,7 +335,11 @@ describe('pendientes por cobertura de Prefactura', () => {
   it('separa pendientes de semanas prefacturadas y de semanas aún sin Prefactura', async () => {
     const { pendingBreakdown } = await import('../../src/engine/indicators');
     const analysis = await run({
-      payroll: [payrollRow(), payrollRow({ Labor: 'CQM', Servicio: '32019' }), payrollRow({ Semana: '12', Fecha: day('2026-03-16') })],
+      payroll: [
+        payrollRow(),
+        payrollRow({ Labor: 'CQM', Servicio: '32019' }),
+        payrollRow({ Semana: '12', Fecha: day('2026-03-16') }),
+      ],
       prefactura: [prefacturaRow()],
     });
     const breakdown = pendingBreakdown(analysis);

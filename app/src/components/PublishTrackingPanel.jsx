@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { buildTrackingRows } from '../engine/tracking';
+import { buildPublishedTracking } from '../engine/published';
 
 export function PublishTrackingPanel({ inputs, startDate }) {
   const [busy, setBusy] = useState(false);
@@ -30,33 +30,8 @@ export function PublishTrackingPanel({ inputs, startDate }) {
     setBusy(true);
     setMsg('Publicando…');
     try {
-      const rows = buildTrackingRows(inputs, startDate).map((r) => ({
-        id: r.id,
-        source: r.source,
-        date: r.date,
-        week: r.week,
-        year: r.year,
-        producer: r.producer,
-        hacienda: r.hacienda,
-        suerte: r.suerte,
-        labor: r.labor,
-        service: r.service,
-        name: r.name,
-        unit: r.unit,
-        units: r.units,
-        classification: r.classification,
-        scope: r.scope,
-        ageDays: r.ageDays,
-        ageBase: r.ageBase,
-      }));
-      const maxWeek = rows.reduce((m, r) => Math.max(m, r.week || 0), 0);
-      const payload = {
-        version: 1,
-        generatedAt: new Date().toISOString(),
-        maxWeek,
-        count: rows.length,
-        rows,
-      };
+      const payload = buildPublishedTracking(inputs, startDate);
+      const { rows, maxWeek } = payload;
       const body = JSON.stringify(payload);
       const b64 = btoa(unescape(encodeURIComponent(body)));
       const api = 'https://api.github.com/repos/' + REPO + '/contents/' + PATH;
