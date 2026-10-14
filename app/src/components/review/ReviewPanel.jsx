@@ -1,13 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import {
-  CircleCheck,
-  CloudUpload,
-  Download,
-  FileSearch,
-  FileSpreadsheet,
-  Search,
-  TriangleAlert,
-} from 'lucide-react';
+import { CircleCheck, CloudUpload, Download, FileSearch, FileSpreadsheet, Search, TriangleAlert } from 'lucide-react';
 import { ImportReviewDrawer } from '../ImportReviewDrawer';
 import { ReviewFindingDrawer } from './ReviewFindingDrawer';
 import { exportReviewWorkbook } from '../../engine/exports';
@@ -15,72 +7,70 @@ import { diffRows, parseReviewFile } from '../../engine/importers';
 import { normalizeText } from '../../engine/normalize';
 import { REVIEW_STATUS_LABELS, isReviewComparable, runReview } from '../../engine/review';
 import { formatCurrency, formatNumber } from '../../lib/format';
-
-export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: n }) {
-  const [i, r] = useState(false);
-  const [l, o] = useState('');
-  const [x, m] = useState('all');
-  const [f, S] = useState('all');
-  const [A, E] = useState('all');
-  const [D, I] = useState('all');
-  const [v, N] = useState(null);
-  const [g, d] = useState('all');
-  const [R, O] = useState(null);
-  const [C, y] = useState('');
-  const [_, P] = useState('');
-  const h = useRef(null);
-  const L = (u) => {
+export function ReviewPanel({ inputs, workspace, onWorkspace, onAudit }) {
+  const [reading, setReading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [weekFilter, setWeekFilter] = useState('all');
+  const [haciendaFilter, setHaciendaFilter] = useState('all');
+  const [laborFilter, setLaborFilter] = useState('all');
+  const [selected, setSelected] = useState(null);
+  const [groupFilter, setGroupFilter] = useState('all');
+  const [pending, setPending] = useState(null);
+  const [okMessage, setOkMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const tableRef = useRef(null);
+  const focusGroup = (u) => {
     var T;
-    d(u);
-    m('all');
-    o('');
-    S('all');
-    E('all');
-    I('all');
-    (T = h.current) == null ||
+    setGroupFilter(u);
+    setStatusFilter('all');
+    setSearch('');
+    setWeekFilter('all');
+    setHaciendaFilter('all');
+    setLaborFilter('all');
+    (T = tableRef.current) == null ||
       T.scrollIntoView({
         behavior: 'smooth',
         block: 'start',
       });
   };
-  const F = useMemo(
-    () => (s && a.payroll.length ? runReview(a, s.rows, s.requestedWeekStart, s.requestedWeekEnd) : null),
-    [a, s],
-  );
-  const j = useMemo(
+  const review = useMemo(
     () =>
-      ((F == null ? undefined : F.findings) ?? []).filter((u) => {
+      workspace && inputs.payroll.length
+        ? runReview(inputs, workspace.rows, workspace.requestedWeekStart, workspace.requestedWeekEnd)
+        : null,
+    [inputs, workspace],
+  );
+  const filtered = useMemo(
+    () =>
+      ((review == null ? undefined : review.findings) ?? []).filter((u) => {
         const T = `${u.labor}|${u.services.join(',')}|${u.serviceNames.join(',')}`;
         const q = normalizeText(
           `${u.hacienda} ${u.suerte} ${u.labor} ${u.services.join(' ')} ${u.serviceNames.join(' ')} ${REVIEW_STATUS_LABELS[u.status]}`,
         );
         return (
-          (!l || q.includes(normalizeText(l))) &&
-          (x === 'all' || u.status === x) &&
-          (g === 'all' ||
-            (g === 'covered'
+          (!search || q.includes(normalizeText(search))) &&
+          (statusFilter === 'all' || u.status === statusFilter) &&
+          (groupFilter === 'all' ||
+            (groupFilter === 'covered'
               ? isReviewComparable(u)
-              : g === 'followup'
+              : groupFilter === 'followup'
                 ? ['warning', 'info'].includes(u.severity)
-                : u.severity === g)) &&
-          (f === 'all' || u.week === Number(f)) &&
-          (A === 'all' || u.hacienda === A) &&
-          (D === 'all' || T === D)
+                : u.severity === groupFilter)) &&
+          (weekFilter === 'all' || u.week === Number(weekFilter)) &&
+          (haciendaFilter === 'all' || u.hacienda === haciendaFilter) &&
+          (laborFilter === 'all' || T === laborFilter)
         );
       }),
-    [F, l, x, f, A, D, g],
+    [review, search, statusFilter, weekFilter, haciendaFilter, laborFilter, groupFilter],
   );
-  const w = [...new Set(((F == null ? undefined : F.findings) ?? []).map((u) => u.week))].sort(
-    (u, T) => u - T,
-  );
-  const z = [...new Set(((F == null ? undefined : F.findings) ?? []).map((u) => u.hacienda))].sort();
-  const B = [
+  const weeks = [...new Set(((review == null ? undefined : review.findings) ?? []).map((u) => u.week))].sort((u, T) => u - T);
+  const haciendas = [...new Set(((review == null ? undefined : review.findings) ?? []).map((u) => u.hacienda))].sort();
+  const laborOptions = [
     ...new Map(
-      ((F == null ? undefined : F.findings) ?? []).map((u) => {
+      ((review == null ? undefined : review.findings) ?? []).map((u) => {
         const T = `${u.labor}|${u.services.join(',')}|${u.serviceNames.join(',')}`;
-        const q = u.services.length
-          ? u.services.join(', ')
-          : u.serviceNames.join(', ') || 'sin código de servicio';
+        const q = u.services.length ? u.services.join(', ') : u.serviceNames.join(', ') || 'sin código de servicio';
         return [
           T,
           {
@@ -91,23 +81,23 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
       }),
     ).values(),
   ].sort((u, T) => u.label.localeCompare(T.label));
-  const k = async (u, T) => {
-    !s ||
+  const updatePeriod = async (u, T) => {
+    !workspace ||
       !u ||
       !T ||
       u > T ||
-      (await t({
-        ...s,
+      (await onWorkspace({
+        ...workspace,
         requestedWeekStart: u,
         requestedWeekEnd: T,
       }),
-      S('all'),
-      await n('PERIODO_REVISION_ACTUALIZADO', `Semanas ${u}-${T} para ${s.file.name}.`));
+      setWeekFilter('all'),
+      await onAudit('PERIODO_REVISION_ACTUALIZADO', `Semanas ${u}-${T} para ${workspace.file.name}.`));
   };
-  const p = async (u) => {
-    r(true);
-    P('');
-    y('');
+  const readFile = async (u) => {
+    setReading(true);
+    setErrorMessage('');
+    setOkMessage('');
     try {
       const T = await parseReviewFile(u);
       const q = {
@@ -116,57 +106,54 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
         requestedWeekStart: T.file.weekStart,
         requestedWeekEnd: T.file.weekEnd,
       };
-      O(q);
+      setPending(q);
     } catch (T) {
-      P(
-        (T instanceof Error ? T.message : 'No se pudo leer el archivo.') +
-          ' Se conserva la revisión anterior.',
-      );
+      setErrorMessage((T instanceof Error ? T.message : 'No se pudo leer el archivo.') + ' Se conserva la revisión anterior.');
     } finally {
-      r(false);
+      setReading(false);
     }
   };
-  return a.payroll.length ? (
+  return inputs.payroll.length ? (
     <div className="review-module">
-      {_ && (
+      {errorMessage && (
         <div className="notice error" role="alert">
-          {_}
+          {errorMessage}
         </div>
       )}
-      {C && (
+      {okMessage && (
         <div className="notice ok" role="status">
-          {C}
+          {okMessage}
         </div>
       )}
-      {R && (
+      {pending && (
         <ImportReviewDrawer
-          name={R.file.name}
-          previous={(s == null ? undefined : s.rows) ?? []}
-          incoming={R.rows}
-          skipped={R.file.skippedRows}
-          sameFile={(s == null ? undefined : s.file.hash) === R.file.hash}
-          onCancel={() => O(null)}
+          name={pending.file.name}
+          previous={(workspace == null ? undefined : workspace.rows) ?? []}
+          incoming={pending.rows}
+          metadata={pending.file}
+          sameFile={(workspace == null ? undefined : workspace.file.hash) === pending.file.hash}
+          onCancel={() => setPending(null)}
           onConfirm={async () => {
-            const u = diffRows((s == null ? undefined : s.rows) ?? [], R.rows);
-            await t(R);
+            const u = diffRows((workspace == null ? undefined : workspace.rows) ?? [], pending.rows);
+            await onWorkspace(pending);
             const T =
-              R.file.name +
+              pending.file.name +
               ': formato reconocido; ' +
-              R.rows.length +
+              pending.rows.length +
               ' filas, ' +
               u.added +
               ' agregadas/modificadas, ' +
               u.removed +
               ' retiradas/modificadas. Semanas ' +
-              R.file.weekStart +
+              pending.file.weekStart +
               '–' +
-              R.file.weekEnd +
+              pending.file.weekEnd +
               '. Confirme debajo el período indicado en el correo.';
-            y(T);
-            O(null);
-            L('all');
-            N(null);
-            await n('ARCHIVO_REVISION_CARGADO', T);
+            setOkMessage(T);
+            setPending(null);
+            focusGroup('all');
+            setSelected(null);
+            await onAudit('ARCHIVO_REVISION_CARGADO', T);
           }}
         />
       )}
@@ -175,44 +162,44 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
           <span className="eyebrow">DEPARTAMENTO NEGOCIOS DE CAÑA</span>
           <h2>Revisión por Correo</h2>
           <p>
-            Compare el Excel enviado por correo contra todas las labores manuales registradas en Nómina para
-            las semanas solicitadas.
+            Compare el Excel enviado por correo contra todas las labores manuales registradas en Nómina para las semanas
+            solicitadas.
           </p>
         </div>
         <label className="button primary">
-          <CloudUpload size={17} /> {i ? 'Validando…' : s ? 'Reemplazar Excel' : 'Cargar Excel'}
+          <CloudUpload size={17} /> {reading ? 'Validando…' : workspace ? 'Reemplazar Excel' : 'Cargar Excel'}
           <input
             type="file"
             accept=".xlsx,.xls"
-            disabled={i}
+            disabled={reading}
             onChange={(u) => {
               var q;
               const T = (q = u.target.files) == null ? undefined : q[0];
-              T && p(T);
+              T && readFile(T);
               u.currentTarget.value = '';
             }}
           />
         </label>
       </section>
-      {s ? (
+      {workspace ? (
         <>
           <section className="panel review-source">
             <div className="review-file">
               <FileSpreadsheet />
               <span>
-                <strong>{s.file.name}</strong>
+                <strong>{workspace.file.name}</strong>
                 <small>
-                  {s.file.source === 'PRELOADED'
+                  {workspace.file.source === 'PRELOADED'
                     ? 'Precargado para Revisión por Correo'
                     : 'Actualizado por Carlos Tijerino'}
                   {' · '}
-                  {s.file.rows}
+                  {workspace.file.rows}
                   {' filas · semanas '}
-                  {s.file.weekStart}–{s.file.weekEnd}
+                  {workspace.file.weekStart}–{workspace.file.weekEnd}
                 </small>
                 <code>
                   {'SHA256 '}
-                  {s.file.hash.slice(0, 16)}…
+                  {workspace.file.hash.slice(0, 16)}…
                 </code>
               </span>
               <CircleCheck />
@@ -228,8 +215,8 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
                   type="number"
                   min="1"
                   max="53"
-                  value={s.requestedWeekStart}
-                  onChange={(u) => void k(Number(u.target.value), s.requestedWeekEnd)}
+                  value={workspace.requestedWeekStart}
+                  onChange={(u) => void updatePeriod(Number(u.target.value), workspace.requestedWeekEnd)}
                 />
               </label>
               <label>
@@ -238,26 +225,24 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
                   type="number"
                   min="1"
                   max="53"
-                  value={s.requestedWeekEnd}
-                  onChange={(u) => void k(s.requestedWeekStart, Number(u.target.value))}
+                  value={workspace.requestedWeekEnd}
+                  onChange={(u) => void updatePeriod(workspace.requestedWeekStart, Number(u.target.value))}
                 />
               </label>
             </div>
           </section>
-          {F && (
+          {review && (
             <>
-              {(F.outsidePeriodRows > 0 || F.unexpectedContractorRows > 0) && (
+              {(review.outsidePeriodRows > 0 || review.unexpectedContractorRows > 0) && (
                 <div className="review-alert">
                   <TriangleAlert />
                   <span>
                     <strong>El archivo requiere atención antes de aprobarse.</strong>
                     <small>
-                      {F.outsidePeriodRows
-                        ? `${F.outsidePeriodRows} filas están fuera de las semanas ${F.requestedWeekStart}–${F.requestedWeekEnd}. `
+                      {review.outsidePeriodRows
+                        ? `${review.outsidePeriodRows} filas están fuera de las semanas ${review.requestedWeekStart}–${review.requestedWeekEnd}. `
                         : ''}
-                      {F.unexpectedContractorRows
-                        ? `${F.unexpectedContractorRows} filas no pertenecen a CS9999.`
-                        : ''}
+                      {review.unexpectedContractorRows ? `${review.unexpectedContractorRows} filas no pertenecen a CS9999.` : ''}
                     </small>
                   </span>
                 </div>
@@ -265,45 +250,45 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
               <div className="kpi-grid review-kpis">
                 <ReviewKpi
                   title="Cubiertas en archivo"
-                  value={F.findings.filter(isReviewComparable).length}
+                  value={review.findings.filter(isReviewComparable).length}
                   note="Incluye exceso; no significa cantidad exacta"
                   tone="green"
-                  onClick={() => L('covered')}
+                  onClick={() => focusGroup('covered')}
                 />
                 <ReviewKpi
                   title="Sin incluir / parciales"
-                  value={F.critical}
+                  value={review.critical}
                   note="Unidades de Nómina aún no cubiertas"
                   tone="red"
-                  onClick={() => L('critical')}
+                  onClick={() => focusGroup('critical')}
                 />
                 <ReviewKpi
                   title="Seguimientos"
-                  value={F.warnings}
+                  value={review.warnings}
                   note="Excesos y otras observaciones"
                   tone="blue"
-                  onClick={() => L('followup')}
+                  onClick={() => focusGroup('followup')}
                 />
                 <ReviewKpi
                   title="Total recibido"
-                  value={formatCurrency(F.total)}
-                  note={`${F.reviewRows} filas en el Excel`}
+                  value={formatCurrency(review.total)}
+                  note={`${review.reviewRows} filas en el Excel`}
                   tone="blue"
-                  onClick={() => L('all')}
+                  onClick={() => focusGroup('all')}
                 />
               </div>
-              <div ref={h} className="review-tools">
+              <div ref={tableRef} className="review-tools">
                 <strong>
                   {'Vista: '}
-                  {g === 'critical'
+                  {groupFilter === 'critical'
                     ? 'Pendientes'
-                    : g === 'followup'
+                    : groupFilter === 'followup'
                       ? 'Seguimientos secundarios'
-                      : g === 'covered'
+                      : groupFilter === 'covered'
                         ? 'Cubiertas en archivo'
                         : 'Todos los resultados'}
                 </strong>
-                <button className="button secondary" onClick={() => L('all')}>
+                <button className="button secondary" onClick={() => focusGroup('all')}>
                   Limpiar todos los filtros
                 </button>
               </div>
@@ -316,8 +301,8 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
                   <button
                     className="button secondary"
                     onClick={() => {
-                      exportReviewWorkbook(F, s);
-                      n('INFORME_REVISION_EXPORTADO', s.file.name);
+                      exportReviewWorkbook(review, workspace);
+                      onAudit('INFORME_REVISION_EXPORTADO', workspace.file.name);
                     }}
                   >
                     <Download size={16} />
@@ -329,22 +314,26 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
                     <Search size={16} />
                     <input
                       placeholder="Buscar hacienda, suerte, labor o servicio"
-                      value={l}
-                      onChange={(u) => o(u.target.value)}
+                      value={search}
+                      onChange={(u) => setSearch(u.target.value)}
                     />
                   </div>
-                  <select aria-label="Filtrar por semana" value={f} onChange={(u) => S(u.target.value)}>
+                  <select aria-label="Filtrar por semana" value={weekFilter} onChange={(u) => setWeekFilter(u.target.value)}>
                     <option value="all">Todas las semanas</option>
-                    {w.map((u) => (
+                    {weeks.map((u) => (
                       <option key={u} value={u}>
                         {'Semana '}
                         {u}
                       </option>
                     ))}
                   </select>
-                  <select aria-label="Filtrar por hacienda" value={A} onChange={(u) => E(u.target.value)}>
+                  <select
+                    aria-label="Filtrar por hacienda"
+                    value={haciendaFilter}
+                    onChange={(u) => setHaciendaFilter(u.target.value)}
+                  >
                     <option value="all">Todas las haciendas</option>
-                    {z.map((u) => (
+                    {haciendas.map((u) => (
                       <option key={u} value={u}>
                         {u}
                       </option>
@@ -352,17 +341,21 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
                   </select>
                   <select
                     aria-label="Filtrar por labor y servicio"
-                    value={D}
-                    onChange={(u) => I(u.target.value)}
+                    value={laborFilter}
+                    onChange={(u) => setLaborFilter(u.target.value)}
                   >
                     <option value="all">Todas las labores / servicios</option>
-                    {B.map((u) => (
+                    {laborOptions.map((u) => (
                       <option key={u.key} value={u.key}>
                         {u.label}
                       </option>
                     ))}
                   </select>
-                  <select aria-label="Filtrar por resultado" value={x} onChange={(u) => m(u.target.value)}>
+                  <select
+                    aria-label="Filtrar por resultado"
+                    value={statusFilter}
+                    onChange={(u) => setStatusFilter(u.target.value)}
+                  >
                     <option value="all">Todos los resultados</option>
                     {Object.entries(REVIEW_STATUS_LABELS).map(([u, T]) => (
                       <option key={u} value={u}>
@@ -371,7 +364,7 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
                     ))}
                   </select>
                   <span>
-                    {j.length}
+                    {filtered.length}
                     {' resultados'}
                   </span>
                 </div>
@@ -391,13 +384,13 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
                       </tr>
                     </thead>
                     <tbody>
-                      {j.map((u) => (
+                      {filtered.map((u) => (
                         <tr
                           key={u.id}
                           tabIndex={0}
-                          onClick={() => N(u)}
+                          onClick={() => setSelected(u)}
                           onKeyDown={(T) => {
-                            T.key === 'Enter' && N(u);
+                            T.key === 'Enter' && setSelected(u);
                           }}
                         >
                           <td>
@@ -417,14 +410,11 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
                               {u.services.join(', ') || 'sin código'}
                             </strong>
                             <small>
-                              {u.serviceNames.join(', ') ||
-                                (u.unit === u.reviewUnit ? u.unit : `${u.unit} → ${u.reviewUnit}`)}
+                              {u.serviceNames.join(', ') || (u.unit === u.reviewUnit ? u.unit : `${u.unit} → ${u.reviewUnit}`)}
                             </small>
                           </td>
                           <td>
-                            <span className={`review-status ${u.severity}`}>
-                              {REVIEW_STATUS_LABELS[u.status]}
-                            </span>
+                            <span className={`review-status ${u.severity}`}>{REVIEW_STATUS_LABELS[u.status]}</span>
                             <small>{u.explanation}</small>
                           </td>
                           <td className="num">{formatNumber(u.payrollUnits)}</td>
@@ -440,7 +430,7 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
                       ))}
                     </tbody>
                   </table>
-                  {!j.length && <div className="empty-table">No hay resultados con estos filtros.</div>}
+                  {!filtered.length && <div className="empty-table">No hay resultados con estos filtros.</div>}
                 </div>
               </section>
             </>
@@ -450,13 +440,12 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
         <section className="panel review-empty">
           <FileSpreadsheet />
           <h3>Cargue el Excel recibido por correo</h3>
-          <p>
-            Debe contener la hoja REPORTE y las columnas SEM., Nombre Hacienda, STE., LAB, UM, TARIFA, TOTAL y
-            UND.
-          </p>
+          <p>Debe contener la hoja REPORTE y las columnas SEM., Nombre Hacienda, STE., LAB, UM, TARIFA, TOTAL y UND.</p>
         </section>
       )}
-      {v && s && <ReviewFindingDrawer finding={v} inputs={a} workspace={s} onClose={() => N(null)} />}
+      {selected && workspace && (
+        <ReviewFindingDrawer finding={selected} inputs={inputs} workspace={workspace} onClose={() => setSelected(null)} />
+      )}
     </div>
   ) : (
     <div className="empty-state">
@@ -466,13 +455,13 @@ export function ReviewPanel({ inputs: a, workspace: s, onWorkspace: t, onAudit: 
     </div>
   );
 }
-function ReviewKpi({ title: a, value: s, note: t, tone: n, onClick: i }) {
+function ReviewKpi({ title, value, note, tone, onClick }) {
   return (
-    <button type="button" onClick={i} className={`review-kpi ${n}`}>
-      <span>{a}</span>
-      <strong>{typeof s == 'number' ? s.toLocaleString('es-NI') : s}</strong>
+    <button type="button" onClick={onClick} className={`review-kpi ${tone}`}>
+      <span>{title}</span>
+      <strong>{typeof value == 'number' ? value.toLocaleString('es-NI') : value}</strong>
       <small>
-        {t}
+        {note}
         {' →'}
       </small>
     </button>

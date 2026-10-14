@@ -3,7 +3,10 @@
 const numberFormats = new Map();
 export const formatNumber = (value, decimals = 2) => {
   if (!numberFormats.has(decimals)) {
-    numberFormats.set(decimals, new Intl.NumberFormat('es-NI', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }));
+    numberFormats.set(
+      decimals,
+      new Intl.NumberFormat('es-NI', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }),
+    );
   }
   return numberFormats.get(decimals).format(value);
 };

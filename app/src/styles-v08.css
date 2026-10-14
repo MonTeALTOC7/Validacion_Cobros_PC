@@ -1,0 +1,558 @@
+/* Estilos agregados en v0.8 (tarifas, banderas, calidad de datos, cierres, módulo financiero).
+   Se cargan después de styles.css y reutilizan sus variables. */
+
+.button.compact {
+  padding: 7px 11px;
+  font-size: 12px;
+}
+.muted {
+  color: var(--muted);
+  font-size: 11px;
+}
+.table-tools {
+  flex-wrap: wrap;
+}
+
+/* Banderas de revisión */
+.flag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.flag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.flag-warning {
+  color: var(--amber);
+  background: #fff;
+  border-color: #f0d49c;
+}
+.flag-info {
+  color: var(--blue);
+  background: #fff;
+  border-color: #c7dcec;
+}
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+td.tariff-atypical {
+  color: var(--amber);
+  font-weight: 700;
+}
+td.tariff-atypical::after {
+  content: ' ●';
+  font-size: 8px;
+}
+
+/* Cajón ancho y tablas compactas de evidencia */
+.drawer.drawer-wide {
+  width: min(880px, 96vw);
+}
+.compact-table table {
+  font-size: 11px;
+}
+.compact-table th,
+.compact-table td {
+  padding: 7px 9px;
+}
+.evidence .compact-table {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.evidence > small {
+  display: block;
+  margin-top: 6px;
+}
+
+/* Indicadores compactos */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 15px 0 18px;
+}
+.metric {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 15px;
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+.metric span {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.metric strong {
+  font-size: 20px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.metric small {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.metric-primary {
+  border-color: #b9d9cb;
+  background: linear-gradient(180deg, #fff, var(--green-soft));
+}
+.metric-primary strong {
+  color: var(--green);
+}
+.metric-warning strong {
+  color: var(--amber);
+}
+.metric-action {
+  cursor: pointer;
+}
+
+/* Barras proporcionales */
+.share-bar {
+  display: block;
+  height: 7px;
+  background: #eef3f0;
+  border-radius: 99px;
+  overflow: hidden;
+  min-width: 40px;
+}
+.share-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--green-2), #3a9a7a);
+}
+.share-cell {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+}
+.share-cell .share-bar {
+  width: 70px;
+}
+.bar-list {
+  display: grid;
+  gap: 2px;
+  padding: 10px 14px 14px;
+}
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(60px, 1.2fr) auto 54px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 6px;
+  border: 0;
+  border-bottom: 1px solid #eef3f0;
+  background: transparent;
+  text-align: left;
+  font-size: 12px;
+  color: var(--ink);
+}
+.bar-row:hover:not(.static) {
+  background: #f6faf8;
+}
+.bar-row span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bar-row em {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 10px;
+  margin-right: 4px;
+}
+.bar-row b {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.bar-row small {
+  color: var(--muted);
+  font-size: 10px;
+  text-align: right;
+}
+.bar-row.static small {
+  text-align: left;
+  grid-column: 1 / -1;
+}
+
+/* Tabla genérica ordenable */
+.data-table .sort-button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  font-weight: inherit;
+  padding: 0;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+.data-table tr.clickable {
+  cursor: pointer;
+}
+.data-table tr.clickable:hover td {
+  background: #f6faf8;
+}
+.data-table tfoot td {
+  font-weight: 800;
+  background: #f5f8f6;
+  border-top: 2px solid var(--line);
+}
+.data-table tr.group-start td {
+  border-top: 2px solid var(--line);
+}
+.pending-cell {
+  color: var(--red);
+  font-size: 11px;
+  font-weight: 700;
+}
+.tariff-chips {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Segmentos */
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: #eef3f0;
+  border-radius: 10px;
+  padding: 3px;
+  margin: 4px 0 12px;
+}
+.segmented button {
+  border: 0;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.segmented button[aria-pressed='true'] {
+  background: #fff;
+  color: var(--green);
+  box-shadow: 0 1px 4px #0000001a;
+}
+.panel-head .segmented {
+  margin: 0;
+}
+
+/* Avisos y franjas */
+.alert-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid #f0d49c;
+  background: var(--amber-soft);
+  color: var(--amber);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 0 0 18px;
+  text-align: left;
+  font-size: 12px;
+}
+.alert-strip span {
+  flex: 1;
+  color: #6b4a14;
+}
+.alert-strip em {
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.notice-panel,
+.master-source {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+}
+.notice-panel {
+  border-color: #b9d9cb;
+  background: var(--green-soft);
+}
+.notice-panel > svg,
+.master-source > svg {
+  flex: none;
+  color: var(--green);
+}
+.notice-panel div,
+.master-source div {
+  flex: 1;
+}
+.notice-panel p,
+.master-source p {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+/* Calidad de datos */
+.quality-list {
+  display: grid;
+}
+.quality-item {
+  border-bottom: 1px solid #eef3f0;
+  padding: 0 20px;
+}
+.quality-item summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 13px 0;
+  cursor: pointer;
+  font-size: 13px;
+}
+.quality-item p {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+.quality-item .table-wrap {
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.quality-item table {
+  font-size: 11px;
+}
+
+/* Respaldo */
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 16px 20px 6px;
+}
+.backup-panel > small {
+  display: block;
+  padding: 4px 20px 16px;
+}
+
+/* Cierres */
+.reopen-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+  margin-top: 12px;
+}
+.reopen-box label {
+  flex: 1 1 260px;
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+.reopen-box input {
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.closure-history {
+  padding: 4px 23px 12px;
+}
+.closure-history h3 {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+}
+.closure-history p {
+  margin: 4px 0;
+  font-size: 12px;
+}
+.inline-filter {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.inline-filter select {
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.field-wide textarea {
+  width: 100%;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+/* Seguimiento: tarifa en el detalle */
+.exec-tariff {
+  display: block;
+  margin-top: 4px;
+  color: var(--blue);
+}
+
+/* Módulo financiero */
+.finance-module .exec-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+.finance-toolbar {
+  grid-template-columns: repeat(6, minmax(0, 1fr)) minmax(180px, 1.4fr) auto;
+}
+.finance-toolbar .search-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8faf8;
+  border: 1px solid #e4ebe5;
+  border-radius: 7px;
+  padding: 0 8px;
+}
+.finance-toolbar .search-box input {
+  border: 0;
+  background: transparent;
+  padding: 9px 2px;
+  width: 100%;
+  min-width: 0;
+  font-size: 12px;
+}
+.finance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.finance-grid .panel {
+  margin-bottom: 18px;
+}
+.concentration {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+.concentration .metric {
+  box-shadow: none;
+}
+.finance-bars button i {
+  background: linear-gradient(180deg, #3a9a7a, var(--green));
+}
+.finance-module .panel-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.finance-module .exec-method svg {
+  vertical-align: -2px;
+}
+
+@media (max-width: 1250px) {
+  .metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .finance-toolbar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 800px) {
+  .finance-grid {
+    grid-template-columns: 1fr;
+  }
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .concentration {
+    grid-template-columns: 1fr;
+  }
+  .notice-panel,
+  .master-source {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+@media (max-width: 650px) {
+  .finance-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .finance-toolbar .finance-search {
+    grid-column: 1 / -1;
+  }
+  .metric strong {
+    font-size: 17px;
+  }
+  .bar-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .bar-row .share-bar {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+  .bar-row small {
+    display: none;
+  }
+}
+@media print {
+  .alert-strip,
+  .backup-panel,
+  .segmented {
+    display: none;
+  }
+}
+
+/* Tarjetas de archivo: permitir que nombres largos se ajusten en pantallas estrechas */
+.file-card > div:not(.file-icon):not(.replace-file) {
+  flex: 1;
+  min-width: 0;
+}
+.file-card p,
+.file-validation small {
+  overflow-wrap: anywhere;
+}
+.file-register code {
+  overflow-wrap: anywhere;
+}
+.file-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 800px) {
+  .file-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Tablas más compactas (10 columnas en conciliación con Tarifa) */
+th,
+td {
+  padding-left: 9px;
+  padding-right: 9px;
+}
+td.num {
+  white-space: nowrap;
+}
+.metric strong {
+  font-size: clamp(16px, 1.35vw, 20px);
+  white-space: nowrap;
+}
+@media (max-width: 650px) {
+  .metric strong {
+    white-space: normal;
+  }
+}

@@ -1,27 +1,22 @@
 import { useState } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { isValidRule } from '../../engine/applications';
-
-export function ApplicationRulesEditor({ settings: a, choices: s, onSettings: t }) {
-  const [n, i] = useState('base');
-  const [r, l] = useState({
-    ...a.base,
+export function ApplicationRulesEditor({ settings, choices, onSettings }) {
+  const [target, setTarget] = useState('base');
+  const [draft, setDraft] = useState({
+    ...settings.base,
   });
-  const o = (f) => {
-    i(f);
-    l({
-      ...x(f),
+  const selectTarget = (f) => {
+    setTarget(f);
+    setDraft({
+      ...ruleFor(f),
     });
   };
-  const x = (f) => (f === 'base' ? a.base : (a.overrides[f] ?? a.base));
-  const m = [
+  const ruleFor = (f) => (f === 'base' ? settings.base : (settings.overrides[f] ?? settings.base));
+  const fields = [
     ['gapDays', 'Separación máxima sin registros', 'Una pausa mayor inicia otro grupo.'],
     ['maxDays', 'Ventana máxima del grupo', 'Evita unir trabajos durante meses.'],
-    [
-      'repeatDays',
-      'Pausa tras completar el área',
-      'Con el área alcanzada, inicia otro grupo tras estos días.',
-    ],
+    ['repeatDays', 'Pausa tras completar el área', 'Con el área alcanzada, inicia otro grupo tras estos días.'],
     ['tolerancePct', 'Tolerancia de área (%)', 'Margen alrededor del área para clasificarla como completa.'],
   ];
   return (
@@ -32,25 +27,25 @@ export function ApplicationRulesEditor({ settings: a, choices: s, onSettings: t 
       </summary>
       <div className="application-body">
         <p>
-          Estos son criterios de agrupación editables, no recomendaciones agronómicas. Cambiar una regla
-          recalcula la estimación; no altera Nómina, cantidades ni cobros.
+          Estos son criterios de agrupación editables, no recomendaciones agronómicas. Cambiar una regla recalcula la estimación;
+          no altera Nómina, cantidades ni cobros.
         </p>
         <label>
           Aplicar regla a
-          <select value={n} onChange={(f) => o(f.target.value)}>
+          <select value={target} onChange={(f) => selectTarget(f.target.value)}>
             <option value="base">Regla general</option>
-            {s.map(([f, S]) => (
+            {choices.map(([f, S]) => (
               <option key={f} value={f}>
                 {S.labor}
                 {' / '}
                 {S.service}
-                {a.overrides[f] ? ' · personalizada' : ''}
+                {settings.overrides[f] ? ' · personalizada' : ''}
               </option>
             ))}
           </select>
         </label>
         <div className="application-tools">
-          {m.map(([f, S, A]) => (
+          {fields.map(([f, S, A]) => (
             <label key={f}>
               {S}
               <input
@@ -58,10 +53,10 @@ export function ApplicationRulesEditor({ settings: a, choices: s, onSettings: t 
                 min={f === 'tolerancePct' ? 0 : 1}
                 max={f === 'tolerancePct' ? 20 : f === 'maxDays' ? 180 : 90}
                 step={f === 'tolerancePct' ? 0.1 : 1}
-                value={r[f]}
+                value={draft[f]}
                 onChange={(E) =>
-                  l({
-                    ...r,
+                  setDraft({
+                    ...draft,
                     [f]: Number(E.target.value),
                   })
                 }
@@ -70,27 +65,26 @@ export function ApplicationRulesEditor({ settings: a, choices: s, onSettings: t 
             </label>
           ))}
         </div>
-        {!isValidRule(r) && (
+        {!isValidRule(draft) && (
           <p role="alert">
-            Revise los valores: separación 1–90 días, ventana entre la separación y 180 días, pausa 1–ventana,
-            tolerancia 0–20%.
+            Revise los valores: separación 1–90 días, ventana entre la separación y 180 días, pausa 1–ventana, tolerancia 0–20%.
           </p>
         )}
         <button
           className="button primary"
-          disabled={!isValidRule(r)}
+          disabled={!isValidRule(draft)}
           onClick={() =>
-            t(
-              n === 'base'
+            onSettings(
+              target === 'base'
                 ? {
-                    ...a,
-                    base: r,
+                    ...settings,
+                    base: draft,
                   }
                 : {
-                    ...a,
+                    ...settings,
                     overrides: {
-                      ...a.overrides,
-                      [n]: r,
+                      ...settings.overrides,
+                      [target]: draft,
                     },
                   },
             )
@@ -98,16 +92,16 @@ export function ApplicationRulesEditor({ settings: a, choices: s, onSettings: t 
         >
           Guardar y recalcular
         </button>
-        {n !== 'base' && a.overrides[n] && (
+        {target !== 'base' && settings.overrides[target] && (
           <button
             className="button secondary"
             onClick={() => {
               const f = {
-                ...a.overrides,
+                ...settings.overrides,
               };
-              delete f[n];
-              t({
-                ...a,
+              delete f[target];
+              onSettings({
+                ...settings,
                 overrides: f,
               });
             }}

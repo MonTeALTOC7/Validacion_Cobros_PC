@@ -14,128 +14,131 @@ import {
 } from 'lucide-react';
 import { ApplicationsView } from './ApplicationsView';
 import { AGE_BUCKETS, PRIORITY_LABORS, countDistinct, groupEntries, lotLabel } from './helpers';
-import {
-  buildApplicationEpisodes,
-  clipEpisodesToRows,
-  loadApplicationRules,
-} from '../../engine/applications';
+import { buildApplicationEpisodes, clipEpisodesToRows, loadApplicationRules } from '../../engine/applications';
 import { normalizeText } from '../../engine/normalize';
-import {
-  ageBucket,
-  buildTrackingRows,
-  laborDisplayName,
-  laborUnitKey,
-  sumUnits,
-} from '../../engine/tracking';
-import { downloadBlob, formatNumber } from '../../lib/format';
+import { ageBucket, buildTrackingRows, laborDisplayName, laborUnitKey, sumUnits } from '../../engine/tracking';
+import { downloadBlob, formatCurrency, formatNumber } from '../../lib/format';
+import { APPLICATION_RULES_STORAGE_KEY } from '../../engine/applications';
+import { comparePeriods, parsePeriodKey } from '../../engine/periods';
+import { periodLongText, periodText } from '../../lib/labels';
 
-export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
-  var Pa;
-  var Ia;
-  const n = useMemo(() => buildTrackingRows(a, s), [a, s]);
-  const [i, r] = useState(loadApplicationRules);
-  const [l, o] = useState('');
-  const x = useMemo(() => buildApplicationEpisodes(n, a.master, i), [n, a.master, i]);
-  const m = (c) => {
-    r(c);
+/** Período de una fila de seguimiento ("AAAA-SNN"); compatible con filas sin año. */
+const periodOfRow = (row) => row.period || `S${row.week}`;
+const comparePeriodKeys = (a, b) =>
+  parsePeriodKey(a) && parsePeriodKey(b) ? comparePeriods(a, b) : String(a).localeCompare(String(b));
+export function TrackingPanel({ inputs, startDate, onAudit }) {
+  var firstGroup;
+  var activeGroup;
+  const rows = useMemo(() => buildTrackingRows(inputs, startDate), [inputs, startDate]);
+  const [rules, setRules] = useState(loadApplicationRules);
+  const [rulesMessage, setRulesMessage] = useState('');
+  const episodes = useMemo(() => buildApplicationEpisodes(rows, inputs.master, rules), [rows, inputs.master, rules]);
+  const saveRules = (c) => {
+    setRules(c);
     try {
-      localStorage.setItem('casur-application-rules-v1', JSON.stringify(c));
-      o('Reglas guardadas en este dispositivo. Aplicaciones recalculadas.');
+      localStorage.setItem(APPLICATION_RULES_STORAGE_KEY, JSON.stringify(c));
+      setRulesMessage('Reglas guardadas en este dispositivo. Aplicaciones recalculadas.');
     } catch {
-      o('Aplicaciones recalculadas, pero no se pudieron guardar las reglas en este dispositivo.');
+      setRulesMessage('Aplicaciones recalculadas, pero no se pudieron guardar las reglas en este dispositivo.');
     }
-    t == null ||
-      t('REGLAS_APLICACIONES', JSON.stringify(c)).catch(() =>
-        o('Reglas aplicadas; no fue posible registrar el cambio en auditoría.'),
+    onAudit == null ||
+      onAudit('REGLAS_APLICACIONES', JSON.stringify(c)).catch(() =>
+        setRulesMessage('Reglas aplicadas; no fue posible registrar el cambio en auditoría.'),
       );
   };
-  const [f, S] = useState('Manual');
-  const [A, E] = useState('resumen');
-  const [D, I] = useState('');
-  const [v, N] = useState('');
-  const [g, d] = useState('');
-  const [R, O] = useState('');
-  const [C, y] = useState('all');
-  const [_, P] = useState('all');
-  const [h, L] = useState('all');
-  const [F, j] = useState('Productores');
-  const [w, z] = useState('');
-  const [B, k] = useState(null);
-  const [p, u] = useState('');
-  const [T, q] = useState(false);
-  const [se, V] = useState(null);
-  const [de, X] = useState(1);
-  const [ue, Oe] = useState(1);
-  const ze = useRef(null);
-  const he = n.filter(
+  const [workType, setWorkType] = useState('Manual');
+  const [view, setView] = useState('resumen');
+  const [weekFrom, setWeekFrom] = useState('');
+  const [weekTo, setWeekTo] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [producer, setProducer] = useState('all');
+  const [hacienda, setHacienda] = useState('all');
+  const [ageFilter, setAgeFilter] = useState('all');
+  const [scope, setScope] = useState('Productores');
+  const [selectedLabor, setSelectedLabor] = useState('');
+  const [selectedWeek, setSelectedWeek] = useState(null);
+  const [search, setSearch] = useState('');
+  const [showAllLabors, setShowAllLabors] = useState(false);
+  const [detailRows, setDetailRows] = useState(null);
+  const [rankingPage, setRankingPage] = useState(1);
+  const [detailPage, setDetailPage] = useState(1);
+  const distributionRef = useRef(null);
+  const typeRows = rows.filter(
     (c) =>
-      (f === 'Mecanizada' ? c.classification === 'Mecanizada' : c.classification !== 'Mecanizada') &&
-      (F === 'all' || c.scope === F),
+      (workType === 'Mecanizada' ? c.classification === 'Mecanizada' : c.classification !== 'Mecanizada') &&
+      (scope === 'all' || c.scope === scope),
   );
-  const K = [...new Set(he.map((c) => c.week))].sort((c, M) => c - M);
-  const ra = [...new Set(he.map((c) => c.producer))].sort();
-  const ie = he.filter(
+  const multiYear = new Set(rows.map((row) => row.year).filter((year) => year != null)).size > 1;
+  const weeks = [...new Set(typeRows.map(periodOfRow))].sort(comparePeriodKeys);
+  const producers = [...new Set(typeRows.map((c) => c.producer))].sort();
+  const filtered = typeRows.filter(
     (c) =>
-      (!D || c.week >= Number(D)) &&
-      (!v || c.week <= Number(v)) &&
-      (!g || c.date >= g) &&
-      (!R || c.date <= R) &&
-      (C === 'all' || c.producer === C) &&
-      (_ === 'all' || c.hacienda === _) &&
-      (h === 'all' || ageBucket(c.ageDays) === h),
+      (!weekFrom || comparePeriodKeys(periodOfRow(c), weekFrom) >= 0) &&
+      (!weekTo || comparePeriodKeys(periodOfRow(c), weekTo) <= 0) &&
+      (!dateFrom || c.date >= dateFrom) &&
+      (!dateTo || c.date <= dateTo) &&
+      (producer === 'all' || c.producer === producer) &&
+      (hacienda === 'all' || c.hacienda === hacienda) &&
+      (ageFilter === 'all' || ageBucket(c.ageDays) === ageFilter),
   );
-  const ge = groupEntries(ie, laborUnitKey).sort(([, c], [, M]) => {
+  const laborGroups = groupEntries(filtered, laborUnitKey).sort(([, c], [, M]) => {
     const U = (ee) => {
       const Ta = PRIORITY_LABORS.indexOf(ee.labor);
       return Ta < 0 ? 10 : Ta + (ee.unit === 'HA' || ee.labor === 'ECR' ? 0 : 5);
     };
     return U(c[0]) - U(M[0]) || c[0].labor.localeCompare(M[0].labor) || c[0].unit.localeCompare(M[0].unit);
   });
-  const la = ge.some(([c]) => c === w) ? w : (((Pa = ge[0]) == null ? undefined : Pa[0]) ?? '');
-  const je = ((Ia = ge.find(([c]) => c === la)) == null ? undefined : Ia[1]) ?? [];
-  const pe = je[0];
-  const Se = (pe == null ? undefined : pe.unit) ?? '';
-  const Ea = je.filter(
+  const activeLaborKey = laborGroups.some(([c]) => c === selectedLabor)
+    ? selectedLabor
+    : (((firstGroup = laborGroups[0]) == null ? undefined : firstGroup[0]) ?? '');
+  const laborRows = ((activeGroup = laborGroups.find(([c]) => c === activeLaborKey)) == null ? undefined : activeGroup[1]) ?? [];
+  const laborSample = laborRows[0];
+  const laborUnit = (laborSample == null ? undefined : laborSample.unit) ?? '';
+  const rankingSource = laborRows.filter(
     (c) =>
-      (B === null || c.week === B) &&
-      (!p || normalizeText(c.producer + ' ' + lotLabel(c)).includes(normalizeText(p))),
+      (selectedWeek === null || periodOfRow(c) === selectedWeek) &&
+      (!search || normalizeText(c.producer + ' ' + lotLabel(c)).includes(normalizeText(search))),
   );
-  const ca = clipEpisodesToRows(x, je);
-  const Oa = K.filter((c) => (!D || c >= Number(D)) && (!v || c <= Number(v))).map((c) => ({
-    week: c,
-    rows: je.filter((M) => M.week === c),
-  }));
-  const Ss = Math.max(1, ...Oa.map((c) => sumUnits(c.rows)));
-  const we = groupEntries(Ea, (c) => (C === 'all' ? c.producer : lotLabel(c))).sort(
+  const laborEpisodes = clipEpisodesToRows(episodes, laborRows);
+  const weeklyBars = weeks
+    .filter((c) => (!weekFrom || comparePeriodKeys(c, weekFrom) >= 0) && (!weekTo || comparePeriodKeys(c, weekTo) <= 0))
+    .map((c) => ({
+      week: c,
+      rows: laborRows.filter((M) => periodOfRow(M) === c),
+    }));
+  const maxWeekUnits = Math.max(1, ...weeklyBars.map((c) => sumUnits(c.rows)));
+  const ranking = groupEntries(rankingSource, (c) => (producer === 'all' ? c.producer : lotLabel(c))).sort(
     (c, M) => sumUnits(M[1]) - sumUnits(c[1]) || c[0].localeCompare(M[0]),
   );
-  const ys = Math.max(1, ...we.map(([, c]) => sumUnits(c)));
-  const Be = Math.max(1, Math.ceil(we.length / 12));
-  const ve = Math.min(de, Be);
-  const oa = (c) => {
-    V([...c].sort((M, U) => M.date.localeCompare(U.date)));
-    Oe(1);
+  const maxRankingUnits = Math.max(1, ...ranking.map(([, c]) => sumUnits(c)));
+  const rankingPages = Math.max(1, Math.ceil(ranking.length / 12));
+  const currentRankingPage = Math.min(rankingPage, rankingPages);
+  const openDetail = (c) => {
+    setDetailRows([...c].sort((M, U) => M.date.localeCompare(U.date)));
+    setDetailPage(1);
   };
-  const da = () => {
-    I('');
-    N('');
-    d('');
-    O('');
-    y('all');
-    P('all');
-    L('all');
-    j('Productores');
-    k(null);
-    u('');
-    X(1);
+  const resetFilters = () => {
+    setWeekFrom('');
+    setWeekTo('');
+    setDateFrom('');
+    setDateTo('');
+    setProducer('all');
+    setHacienda('all');
+    setAgeFilter('all');
+    setScope('Productores');
+    setSelectedWeek(null);
+    setSearch('');
+    setRankingPage(1);
   };
-  const wa = (c) => {
-    S(c);
-    z('');
-    q(false);
-    da();
+  const switchWorkType = (c) => {
+    setWorkType(c);
+    setSelectedLabor('');
+    setShowAllLabors(false);
+    resetFilters();
   };
-  const Ns = () => {
+  const exportDetailCsv = () => {
+    // Celdas entre comillas; se neutralizan fórmulas (=, +, @, -) para que Excel no las ejecute.
     const c = (U) =>
       '"' +
       String(U ?? '')
@@ -157,23 +160,29 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
         'Nota de edad',
         'Origen de fecha',
         'Fila',
+        'Archivo',
+        'Tarifa',
+        'Total',
+        'P.FACT',
       ],
-      ...Ea.map((U) => [
+      ...rankingSource.map((U) => [
         U.producer,
         U.hacienda,
         U.suerte,
         U.date,
-        U.week,
+        periodOfRow(U),
         U.labor,
         U.name,
         U.unit,
         U.units,
         U.ageDays ?? '',
         U.ageNote,
-        U.source === 'Nómina'
-          ? 'Ejecución en Nómina'
-          : 'Registro mecanizado; fecha de ejecución no confirmada',
-        'REPORTE!' + U.sourceRow,
+        U.source === 'Nómina' ? 'Ejecución en Nómina' : 'Registro mecanizado; fecha de ejecución no confirmada',
+        (U.sourceSheet ?? 'REPORTE') + '!' + U.sourceRow,
+        U.sourceFile ?? '',
+        U.source === 'Prefactura' ? U.tariff : '',
+        U.source === 'Prefactura' ? U.amount : '',
+        U.pFact ?? '',
       ]),
     ];
     downloadBlob(
@@ -190,8 +199,8 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
       'Labores_realizadas_CASUR.csv',
     );
   };
-  const Da = groupEntries(ie, (c) => c.producer).sort((c, M) => c[0].localeCompare(M[0]));
-  const Cs = groupEntries(ie, (c) => c.unit);
+  const producerGroups = groupEntries(filtered, (c) => c.producer).sort((c, M) => c[0].localeCompare(M[0]));
+  const unitGroups = groupEntries(filtered, (c) => c.unit);
   return (
     <div className="execution-dashboard">
       <div className="exec-heading">
@@ -201,27 +210,27 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
           <p>Qué hicimos, cuánto y en cuáles suertes.</p>
         </div>
         <div className="exec-switch" aria-label="Tipo de seguimiento">
-          <button aria-pressed={f === 'Manual'} onClick={() => wa('Manual')}>
+          <button aria-pressed={workType === 'Manual'} onClick={() => switchWorkType('Manual')}>
             <Sprout size={17} />
             Manuales
           </button>
-          <button aria-pressed={f === 'Mecanizada'} onClick={() => wa('Mecanizada')}>
+          <button aria-pressed={workType === 'Mecanizada'} onClick={() => switchWorkType('Mecanizada')}>
             <Tractor size={17} />
             Mecanizadas
           </button>
         </div>
       </div>
       <nav className="exec-local-nav" aria-label="Vistas de labores">
-        <button aria-current={A === 'resumen' ? 'page' : undefined} onClick={() => E('resumen')}>
+        <button aria-current={view === 'resumen' ? 'page' : undefined} onClick={() => setView('resumen')}>
           Resumen ejecutivo
         </button>
-        <button aria-current={A === 'productores' ? 'page' : undefined} onClick={() => E('productores')}>
+        <button aria-current={view === 'productores' ? 'page' : undefined} onClick={() => setView('productores')}>
           Productores
         </button>
-        <button aria-current={A === 'labores' ? 'page' : undefined} onClick={() => E('labores')}>
+        <button aria-current={view === 'labores' ? 'page' : undefined} onClick={() => setView('labores')}>
           Detalle por labor
         </button>
-        <button aria-current={A === 'applications' ? 'page' : undefined} onClick={() => E('applications')}>
+        <button aria-current={view === 'applications' ? 'page' : undefined} onClick={() => setView('applications')}>
           Aplicaciones por suerte
         </button>
       </nav>
@@ -229,16 +238,16 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
         <label>
           <span>Productor</span>
           <select
-            value={C}
+            value={producer}
             onChange={(c) => {
-              y(c.target.value);
-              P('all');
-              u('');
-              X(1);
+              setProducer(c.target.value);
+              setHacienda('all');
+              setSearch('');
+              setRankingPage(1);
             }}
           >
             <option value="all">Todos los productores</option>
-            {ra.map((c) => (
+            {producers.map((c) => (
               <option key={c}>{c}</option>
             ))}
           </select>
@@ -246,18 +255,17 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
         <label>
           <span>Semana desde</span>
           <select
-            value={D}
+            value={weekFrom}
             onChange={(c) => {
-              I(c.target.value);
-              k(null);
-              X(1);
+              setWeekFrom(c.target.value);
+              setSelectedWeek(null);
+              setRankingPage(1);
             }}
           >
             <option value="">Inicio del período</option>
-            {K.map((c) => (
+            {weeks.map((c) => (
               <option key={c} value={c}>
-                {'Semana '}
-                {c}
+                {periodLongText(c, multiYear)}
               </option>
             ))}
           </select>
@@ -265,23 +273,22 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
         <label>
           <span>Semana hasta</span>
           <select
-            value={v}
+            value={weekTo}
             onChange={(c) => {
-              N(c.target.value);
-              k(null);
-              X(1);
+              setWeekTo(c.target.value);
+              setSelectedWeek(null);
+              setRankingPage(1);
             }}
           >
             <option value="">Último registro</option>
-            {K.map((c) => (
+            {weeks.map((c) => (
               <option key={c} value={c}>
-                {'Semana '}
-                {c}
+                {periodLongText(c, multiYear)}
               </option>
             ))}
           </select>
         </label>
-        <button className="exec-reset" onClick={da}>
+        <button className="exec-reset" onClick={resetFilters}>
           Restablecer
         </button>
       </div>
@@ -295,10 +302,10 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
             Fecha desde
             <input
               type="date"
-              value={g}
+              value={dateFrom}
               onChange={(c) => {
-                d(c.target.value);
-                X(1);
+                setDateFrom(c.target.value);
+                setRankingPage(1);
               }}
             />
           </label>
@@ -306,24 +313,24 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
             Fecha hasta
             <input
               type="date"
-              value={R}
+              value={dateTo}
               onChange={(c) => {
-                O(c.target.value);
-                X(1);
+                setDateTo(c.target.value);
+                setRankingPage(1);
               }}
             />
           </label>
           <label>
             Hacienda
             <select
-              value={_}
+              value={hacienda}
               onChange={(c) => {
-                P(c.target.value);
-                X(1);
+                setHacienda(c.target.value);
+                setRankingPage(1);
               }}
             >
               <option value="all">Todas las haciendas</option>
-              {[...new Set(he.filter((c) => C === 'all' || c.producer === C).map((c) => c.hacienda))]
+              {[...new Set(typeRows.filter((c) => producer === 'all' || c.producer === producer).map((c) => c.hacienda))]
                 .sort()
                 .map((c) => (
                   <option key={c}>{c}</option>
@@ -333,10 +340,10 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
           <label>
             Edad al registro
             <select
-              value={h}
+              value={ageFilter}
               onChange={(c) => {
-                L(c.target.value);
-                X(1);
+                setAgeFilter(c.target.value);
+                setRankingPage(1);
               }}
             >
               <option value="all">Todas las edades</option>
@@ -348,12 +355,12 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
           <label>
             Ámbito
             <select
-              value={F}
+              value={scope}
               onChange={(c) => {
-                j(c.target.value);
-                y('all');
-                P('all');
-                X(1);
+                setScope(c.target.value);
+                setProducer('all');
+                setHacienda('all');
+                setRankingPage(1);
               }}
             >
               <option>Productores</option>
@@ -364,40 +371,40 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
           </label>
         </div>
       </details>
-      {D && v && Number(D) > Number(v) && (
+      {weekFrom && weekTo && comparePeriodKeys(weekFrom, weekTo) > 0 && (
         <p role="alert">La semana inicial debe ser menor o igual a la final.</p>
       )}
-      {g && R && g > R && <p role="alert">La fecha inicial debe ser menor o igual a la final.</p>}
-      {(g || R) && (
+      {dateFrom && dateTo && dateFrom > dateTo && <p role="alert">La fecha inicial debe ser menor o igual a la final.</p>}
+      {(dateFrom || dateTo) && (
         <p className="application-caption">
           {'Fechas seleccionadas: '}
-          {g || 'inicio'}
+          {dateFrom || 'inicio'}
           {' → '}
-          {R || 'último registro'}. Se combinan con las semanas y demás filtros.
+          {dateTo || 'último registro'}. Se combinan con las semanas y demás filtros.
         </p>
       )}
-      {l && (
+      {rulesMessage && (
         <p role="status" className="application-caption">
-          {l}
+          {rulesMessage}
         </p>
       )}
-      {A === 'resumen' && (
+      {view === 'resumen' && (
         <button
           className="exec-reference-hero"
           onClick={() => {
-            E('labores');
-            q(true);
+            setView('labores');
+            setShowAllLabors(true);
           }}
         >
           <span>
             <Sprout size={17} />
-            {f === 'Manual' ? 'LABORES MANUALES REGISTRADAS' : 'LABORES MECANIZADAS REPORTADAS'}
+            {workType === 'Manual' ? 'LABORES MANUALES REGISTRADAS' : 'LABORES MECANIZADAS REPORTADAS'}
           </span>
           <strong>
-            {countDistinct(ie, (c) => c.labor)} <small>labores distintas</small>
+            {countDistinct(filtered, (c) => c.labor)} <small>labores distintas</small>
           </strong>
           <div className="exec-unit-legend">
-            {Cs.map(([c, M]) => (
+            {unitGroups.map(([c, M]) => (
               <span key={c}>
                 <b>{formatNumber(sumUnits(M), 1)}</b>
                 <small>{c === 'HA' ? 'HA · acumuladas' : c}</small>
@@ -406,13 +413,13 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
           </div>
           <div className="exec-hero-reach">
             <span>
-              <b>{countDistinct(ie, (c) => c.producer)}</b>Productores
+              <b>{countDistinct(filtered, (c) => c.producer)}</b>Productores
             </span>
             <span>
-              <b>{countDistinct(ie, lotLabel)}</b>Suertes
+              <b>{countDistinct(filtered, lotLabel)}</b>Suertes
             </span>
             <span>
-              <b>{countDistinct(ie, (c) => c.week)}</b>Semanas con actividad
+              <b>{countDistinct(filtered, periodOfRow)}</b>Semanas con actividad
             </span>
           </div>
           <em>
@@ -422,41 +429,41 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
         </button>
       )}
       <div className="exec-reach">
-        <button onClick={() => E('productores')}>
+        <button onClick={() => setView('productores')}>
           <Users size={18} />
-          <b>{countDistinct(ie, (c) => c.producer)}</b>
+          <b>{countDistinct(filtered, (c) => c.producer)}</b>
           {' productores · ver fichas'}
         </button>
         <span>
           <MapPin size={18} />
-          <b>{countDistinct(ie, lotLabel)}</b>
+          <b>{countDistinct(filtered, lotLabel)}</b>
           {' suertes atendidas'}
         </span>
         <span>
           <Leaf size={18} />
-          <b>{countDistinct(ie, (c) => c.labor)}</b>
+          <b>{countDistinct(filtered, (c) => c.labor)}</b>
           {' labores registradas'}
         </span>
         <span>
-          S{D || K[0] || '—'}–S{v || K.at(-1) || '—'}
+          {periodText(weekFrom || weeks[0], multiYear) || '—'}–{periodText(weekTo || weeks.at(-1), multiYear) || '—'}
         </span>
       </div>
-      {A === 'applications' ? (
+      {view === 'applications' ? (
         <ApplicationsView
-          key={[f, D, v, g, R, C, _, h, F].join('|')}
-          episodes={x}
-          rows={ie}
-          settings={i}
-          onSettings={m}
-          onOpen={oa}
+          key={[workType, weekFrom, weekTo, dateFrom, dateTo, producer, hacienda, ageFilter, scope].join('|')}
+          episodes={episodes}
+          rows={filtered}
+          settings={rules}
+          onSettings={saveRules}
+          onOpen={openDetail}
         />
-      ) : A === 'productores' ? (
+      ) : view === 'productores' ? (
         <div className="exec-producer-cards">
           <div className="exec-section-label">
             <h3>Productores atendidos</h3>
             <span>Toque una ficha para desplegar sus labores</span>
           </div>
-          {Da.map(([c, M]) => (
+          {producerGroups.map(([c, M]) => (
             <details key={c} className="exec-producer-card">
               <summary>
                 <span>
@@ -480,7 +487,7 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
                     <b>{countDistinct(M, lotLabel)}</b>Suertes
                   </span>
                   <span>
-                    <b>{countDistinct(M, (U) => U.week)}</b>Semanas
+                    <b>{countDistinct(M, periodOfRow)}</b>Semanas
                   </span>
                   {groupEntries(M, (U) => U.unit).map(([U, ee]) => (
                     <span key={U}>
@@ -495,13 +502,13 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
                     key={U}
                     className="exec-producer-labor"
                     onClick={() => {
-                      y(c);
-                      P('all');
-                      z(U);
-                      E('labores');
-                      k(null);
-                      u('');
-                      X(1);
+                      setProducer(c);
+                      setHacienda('all');
+                      setSelectedLabor(U);
+                      setView('labores');
+                      setSelectedWeek(null);
+                      setSearch('');
+                      setRankingPage(1);
                     }}
                   >
                     <span>
@@ -525,7 +532,7 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
               </div>
             </details>
           ))}
-          {!Da.length && <p className="exec-empty">No hay productores con estos filtros.</p>}
+          {!producerGroups.length && <p className="exec-empty">No hay productores con estos filtros.</p>}
         </div>
       ) : (
         <>
@@ -534,17 +541,17 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
             <span>Seleccione una tarjeta para explorar sus resultados</span>
           </div>
           <div className="exec-labor-cards">
-            {(T ? ge : ge.slice(0, 4)).map(([c, M]) => (
+            {(showAllLabors ? laborGroups : laborGroups.slice(0, 4)).map(([c, M]) => (
               <button
                 key={c}
-                className={la === c ? 'exec-labor-card active' : 'exec-labor-card'}
-                aria-pressed={la === c}
+                className={activeLaborKey === c ? 'exec-labor-card active' : 'exec-labor-card'}
+                aria-pressed={activeLaborKey === c}
                 onClick={() => {
-                  E('labores');
-                  z(c);
-                  k(null);
-                  u('');
-                  X(1);
+                  setView('labores');
+                  setSelectedLabor(c);
+                  setSelectedWeek(null);
+                  setSearch('');
+                  setRankingPage(1);
                 }}
               >
                 <span className="exec-card-top">
@@ -565,52 +572,52 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
               </button>
             ))}
           </div>
-          {ge.length > 4 && (
-            <button className="exec-more" onClick={() => q(!T)}>
-              {T ? 'Mostrar principales' : 'Ver las ' + ge.length + ' combinaciones de labor y unidad'}
+          {laborGroups.length > 4 && (
+            <button className="exec-more" onClick={() => setShowAllLabors(!showAllLabors)}>
+              {showAllLabors ? 'Mostrar principales' : 'Ver las ' + laborGroups.length + ' combinaciones de labor y unidad'}
               <ChevronRight size={15} />
             </button>
           )}
-          {pe ? (
+          {laborSample ? (
             <>
               <section className="exec-spotlight">
                 <div>
                   <span>
-                    {pe.labor}
+                    {laborSample.labor}
                     {' / '}
-                    {pe.unit}
+                    {laborSample.unit}
                   </span>
-                  <h3>{laborDisplayName(pe)}</h3>
+                  <h3>{laborDisplayName(laborSample)}</h3>
                   <p>
-                    {f === 'Manual' ? 'Cantidad ejecutada registrada' : 'Cantidad mecanizada reportada'}
+                    {workType === 'Manual' ? 'Cantidad ejecutada registrada' : 'Cantidad mecanizada reportada'}
                     {' · '}
-                    {C === 'all' ? 'todos los productores' : C}
+                    {producer === 'all' ? 'todos los productores' : producer}
                   </p>
                 </div>
                 <div>
                   <strong>
-                    {formatNumber(sumUnits(je))}
-                    <small>{Se}</small>
+                    {formatNumber(sumUnits(laborRows))}
+                    <small>{laborUnit}</small>
                   </strong>
                   <span>
-                    {countDistinct(je, lotLabel)}
+                    {countDistinct(laborRows, lotLabel)}
                     {' suertes · '}
-                    {countDistinct(je, (c) => c.week)}
+                    {countDistinct(laborRows, periodOfRow)}
                     {' semanas con actividad'}
                   </span>
                 </div>
               </section>
-              <button className="application-shortcut" onClick={() => E('applications')}>
+              <button className="application-shortcut" onClick={() => setView('applications')}>
                 <span>
                   <strong>
-                    {ca.length}
+                    {laborEpisodes.length}
                     {' grupos de trabajo · '}
-                    {pe.labor}
+                    {laborSample.labor}
                   </strong>
                   <small>
-                    {ca.filter((c) => c.status === 'COMPLETA').length}
+                    {laborEpisodes.filter((c) => c.status === 'COMPLETA').length}
                     {' con área completa estimada · '}
-                    {ca.filter((c) => c.status === 'PARCIAL').length}
+                    {laborEpisodes.filter((c) => c.status === 'PARCIAL').length}
                     {' parciales · abrir vista de todas las aplicaciones por suerte'}
                   </small>
                 </span>
@@ -622,35 +629,35 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
                     <div>
                       <h3>Evolución semanal</h3>
                       <p>
-                        {Se}
+                        {laborUnit}
                         {' por semana · pulse una barra para ver dónde se trabajó'}
                       </p>
                     </div>
-                    {B !== null && (
+                    {selectedWeek !== null && (
                       <button
                         className="exec-reset"
                         onClick={() => {
-                          k(null);
-                          X(1);
+                          setSelectedWeek(null);
+                          setRankingPage(1);
                         }}
                       >
-                        Quitar S{B}
+                        Quitar {periodText(selectedWeek, multiYear)}
                       </button>
                     )}
                   </div>
                   <div className="exec-week-scroll">
                     <div className="exec-week-bars">
-                      {Oa.map((c) => (
+                      {weeklyBars.map((c) => (
                         <button
                           key={c.week}
-                          className={B === c.week ? 'active' : ''}
-                          aria-label={'Semana ' + c.week + ': ' + formatNumber(sumUnits(c.rows)) + ' ' + Se}
+                          className={selectedWeek === c.week ? 'active' : ''}
+                          aria-label={periodLongText(c.week, multiYear) + ': ' + formatNumber(sumUnits(c.rows)) + ' ' + laborUnit}
                           disabled={!c.rows.length}
                           onClick={() => {
                             var M;
-                            k(c.week);
-                            X(1);
-                            (M = ze.current) == null ||
+                            setSelectedWeek(c.week);
+                            setRankingPage(1);
+                            (M = distributionRef.current) == null ||
                               M.scrollIntoView({
                                 behavior: 'smooth',
                                 block: 'start',
@@ -660,11 +667,11 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
                           <span className="exec-bar-track">
                             <i
                               style={{
-                                height: (Math.max(0, sumUnits(c.rows)) / Ss) * 100 + '%',
+                                height: (Math.max(0, sumUnits(c.rows)) / maxWeekUnits) * 100 + '%',
                               }}
                             />
                           </span>
-                          <b>S{c.week}</b>
+                          <b>{periodText(c.week, multiYear)}</b>
                           <small>{formatNumber(sumUnits(c.rows), 1)}</small>
                         </button>
                       ))}
@@ -676,67 +683,67 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
                     <div>
                       <h3>Edad de la caña</h3>
                       <p>
-                        {Se}
+                        {laborUnit}
                         {' según edad al registro'}
                       </p>
                     </div>
                   </div>
                   <div className="exec-age-list">
                     {AGE_BUCKETS.map((c) => {
-                      const M = je.filter((U) => ageBucket(U.ageDays) === c);
+                      const M = laborRows.filter((U) => ageBucket(U.ageDays) === c);
                       return (
                         <button
                           key={c}
                           disabled={!M.length}
                           onClick={() => {
-                            L(c);
-                            k(null);
-                            X(1);
+                            setAgeFilter(c);
+                            setSelectedWeek(null);
+                            setRankingPage(1);
                           }}
                         >
                           <span>{c}</span>
                           <b>
                             {formatNumber(sumUnits(M))}
-                            <small>{Se}</small>
+                            <small>{laborUnit}</small>
                           </b>
                         </button>
                       );
                     })}
                   </div>
-                  {h !== 'all' && (
-                    <button className="exec-more" onClick={() => L('all')}>
+                  {ageFilter !== 'all' && (
+                    <button className="exec-more" onClick={() => setAgeFilter('all')}>
                       Ver todas las edades
                     </button>
                   )}
                 </section>
               </div>
-              <section className="panel exec-distribution" ref={ze}>
+              <section className="panel exec-distribution" ref={distributionRef}>
                 <div className="panel-head">
                   <div>
                     <span className="exec-eyebrow">
-                      {B !== null ? 'SEMANA ' + B : 'DISTRIBUCIÓN DEL TRABAJO'}
+                      {selectedWeek !== null ? periodLongText(selectedWeek, multiYear).toUpperCase() : 'DISTRIBUCIÓN DEL TRABAJO'}
                     </span>
-                    <h3>{C === 'all' ? '¿A qué productores atendimos?' : 'Trabajo por suerte'}</h3>
+                    <h3>{producer === 'all' ? '¿A qué productores atendimos?' : 'Trabajo por suerte'}</h3>
                     <p>
-                      {laborDisplayName(pe)}
+                      {laborDisplayName(laborSample)}
                       {' · '}
-                      {Se}
-                      {C !== 'all' && ' · ' + C}
+                      {laborUnit}
+                      {producer !== 'all' && ' · ' + producer}
                     </p>
                   </div>
-                  <button className="button secondary" onClick={Ns}>
+                  <button className="button secondary" onClick={exportDetailCsv}>
                     <ArrowDownToLine size={16} />
                     Exportar detalle
                   </button>
                 </div>
                 <div className="exec-breadcrumb">
-                  {C !== 'all' && (
+                  {producer !== 'all' && (
                     <button
                       onClick={() => {
-                        y('all');
-                        P('all');
-                        u('');
-                        X(1);
+                        setProducer('all');
+                        setHacienda('all');
+                        setSearch('');
+                        setRankingPage(1);
                       }}
                     >
                       <ArrowLeft size={15} />
@@ -745,75 +752,69 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
                   )}
                   <input
                     aria-label="Buscar productor o suerte"
-                    placeholder={C === 'all' ? 'Buscar productor…' : 'Buscar hacienda o suerte…'}
-                    value={p}
+                    placeholder={producer === 'all' ? 'Buscar productor…' : 'Buscar hacienda o suerte…'}
+                    value={search}
                     onChange={(c) => {
-                      u(c.target.value);
-                      X(1);
+                      setSearch(c.target.value);
+                      setRankingPage(1);
                     }}
                   />
                   <span>
-                    {we.length} {C === 'all' ? 'productores' : 'suertes'}
+                    {ranking.length} {producer === 'all' ? 'productores' : 'suertes'}
                   </span>
                 </div>
                 <div className="exec-ranking">
-                  {we.slice((ve - 1) * 12, ve * 12).map(([c, M], U) => (
+                  {ranking.slice((currentRankingPage - 1) * 12, currentRankingPage * 12).map(([c, M], U) => (
                     <div key={c} className="exec-rank-row">
-                      <span className="exec-rank-num">{(ve - 1) * 12 + U + 1}</span>
+                      <span className="exec-rank-num">{(currentRankingPage - 1) * 12 + U + 1}</span>
                       <button
                         className="exec-rank-main"
                         onClick={() => {
-                          C === 'all' ? (y(c), P('all'), u(''), X(1)) : oa(M);
+                          producer === 'all'
+                            ? (setProducer(c), setHacienda('all'), setSearch(''), setRankingPage(1))
+                            : openDetail(M);
                         }}
                       >
                         <span>
                           <strong>{c.replace(' · titular sin confirmar', '')}</strong>
                           <small>
-                            {C === 'all' ? countDistinct(M, lotLabel) + ' suertes · ' : ''}
-                            {countDistinct(M, (ee) => ee.week)}
+                            {producer === 'all' ? countDistinct(M, lotLabel) + ' suertes · ' : ''}
+                            {countDistinct(M, periodOfRow)}
                             {' semanas'}
-                            {M.some((ee) => ee.producer.includes('titular sin confirmar'))
-                              ? ' · agrupado por hacienda'
-                              : ''}
+                            {M.some((ee) => ee.producer.includes('titular sin confirmar')) ? ' · agrupado por hacienda' : ''}
                           </small>
                         </span>
                         <span className="exec-rank-meter">
                           <i
                             style={{
-                              width: (Math.max(0, sumUnits(M)) / ys) * 100 + '%',
+                              width: (Math.max(0, sumUnits(M)) / maxRankingUnits) * 100 + '%',
                             }}
                           />
                         </span>
                       </button>
                       <b className="exec-rank-total">
                         {formatNumber(sumUnits(M))}
-                        <small>{Se}</small>
+                        <small>{laborUnit}</small>
                       </b>
-                      <button
-                        className="exec-evidence-link"
-                        onClick={() => oa(M)}
-                        aria-label={'Ver detalle de ' + c}
-                      >
+                      <button className="exec-evidence-link" onClick={() => openDetail(M)} aria-label={'Ver detalle de ' + c}>
                         Detalle
                         <ChevronRight size={15} />
                       </button>
                     </div>
                   ))}
                 </div>
-                {!we.length && (
-                  <p className="exec-empty">Sin coincidencias. Quite la búsqueda o la semana seleccionada.</p>
-                )}
-                {Be > 1 && (
+                {!ranking.length && <p className="exec-empty">Sin coincidencias. Quite la búsqueda o la semana seleccionada.</p>}
+                {rankingPages > 1 && (
                   <div className="pagination">
-                    <button disabled={ve === 1} onClick={() => X(ve - 1)}>
+                    <button disabled={currentRankingPage === 1} onClick={() => setRankingPage(currentRankingPage - 1)}>
                       Anterior
                     </button>
                     <span>
-                      {ve}
+                      {currentRankingPage}
                       {' / '}
-                      {Be}
+                      {rankingPages}
                     </span>
-                    <button disabled={ve === Be} onClick={() => X(ve + 1)}>
+                    <button disabled={currentRankingPage === rankingPages} onClick={() => setRankingPage(currentRankingPage + 1)}>
                       Siguiente
                     </button>
                   </div>
@@ -825,7 +826,7 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
               <Sprout size={30} />
               <h3>No hay labores con estos filtros</h3>
               <p>Pruebe otro período, productor o ámbito.</p>
-              <button className="button secondary" onClick={da}>
+              <button className="button secondary" onClick={resetFilters}>
                 Ver todo el período
               </button>
             </section>
@@ -833,61 +834,53 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
         </>
       )}
       <footer className="exec-method">
-        <p>
-          Las HA representan trabajo acumulado, no superficie única. Cada labor conserva su propia unidad.
-        </p>
+        <p>Las HA representan trabajo acumulado, no superficie única. Cada labor conserva su propia unidad.</p>
         <details>
           <summary>Cómo se interpretan los datos, las aplicaciones y la edad</summary>
           <p>
-            Las manuales usan los registros de ejecución de Nómina. Las mecanizadas usan el reporte SIAGRI
-            disponible; sus fechas de registro no acreditan el día de ejecución. No se duplican las labores
-            manuales con sus cobros.
+            Las manuales usan los registros de ejecución de Nómina. Las mecanizadas usan el reporte SIAGRI disponible; sus fechas
+            de registro no acreditan el día de ejecución. No se duplican las labores manuales con sus cobros.
           </p>
           <p>
             {'Aplicaciones: agrupación estimada por suerte, labor, servicio, unidad y origen, desde '}
-            {s}. Se conservan los registros del mismo día juntos; se separan por pausas, ventana máxima o
-            cambio de ciclo conocido. No se mezclan servicios distintos ni se convierten D/H, MJO u otras
-            unidades en hectáreas. Los números de grupo se recalculan si cambia el historial o las reglas.
+            {startDate}. Se conservan los registros del mismo día juntos; se separan por pausas, ventana máxima o cambio de ciclo
+            conocido. No se mezclan servicios distintos ni se convierten D/H, MJO u otras unidades en hectáreas. Los números de
+            grupo se recalculan si cambia el historial o las reglas.
           </p>
           <p>
-            Edad: días desde la siembra o último corte del maestro, el más reciente. Los ciclos históricos no
-            disponibles se muestran “Sin edad”.
+            Edad: días desde la siembra o último corte del maestro, el más reciente. Los ciclos históricos no disponibles se
+            muestran “Sin edad”.
           </p>
         </details>
       </footer>
-      {se && (
+      {detailRows && (
         <>
-          <div className="drawer-overlay" onClick={() => V(null)} />
-          <aside
-            className="drawer exec-detail"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Detalle del trabajo realizado"
-          >
+          <div className="drawer-overlay" onClick={() => setDetailRows(null)} />
+          <aside className="drawer exec-detail" role="dialog" aria-modal="true" aria-label="Detalle del trabajo realizado">
             <div className="drawer-head">
               <div>
                 <span>TRABAJO REALIZADO / DETALLE</span>
-                <h2>{se[0].producer.replace(' · titular sin confirmar', '')}</h2>
+                <h2>{detailRows[0].producer.replace(' · titular sin confirmar', '')}</h2>
               </div>
-              <button aria-label="Cerrar detalle" onClick={() => V(null)}>
+              <button aria-label="Cerrar detalle" onClick={() => setDetailRows(null)}>
                 <X />
               </button>
             </div>
             <div className="drawer-body">
               <div className="exec-detail-total">
-                <span>{laborDisplayName(se[0])}</span>
+                <span>{laborDisplayName(detailRows[0])}</span>
                 <strong>
-                  {formatNumber(sumUnits(se))}
-                  <small>{se[0].unit}</small>
+                  {formatNumber(sumUnits(detailRows))}
+                  <small>{detailRows[0].unit}</small>
                 </strong>
                 <p>
-                  {countDistinct(se, lotLabel)}
+                  {countDistinct(detailRows, lotLabel)}
                   {' suertes · '}
-                  {countDistinct(se, (c) => c.week)}
+                  {countDistinct(detailRows, periodOfRow)}
                   {' semanas'}
                 </p>
               </div>
-              {se.slice((ue - 1) * 30, ue * 30).map((c) => (
+              {detailRows.slice((detailPage - 1) * 30, detailPage * 30).map((c) => (
                 <article key={c.id} className="exec-work-event">
                   <div>
                     <strong>
@@ -902,8 +895,8 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
                   </div>
                   <p>
                     {c.date}
-                    {' · semana '}
-                    {c.week}
+                    {' · '}
+                    {periodLongText(periodOfRow(c), true).toLowerCase()}
                     {' · '}
                     {c.labor}
                     {' / '}
@@ -916,11 +909,26 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
                       : c.ageDays + ' días (' + formatNumber(c.ageDays / 30.4375, 1) + ' meses)'}
                     {c.source === 'Prefactura' ? ' · fecha de registro, ejecución no confirmada' : ''}
                   </small>
+                  {c.source === 'Prefactura' && (
+                    <small className="exec-tariff">
+                      Tarifa cobrada {formatNumber(c.tariff ?? 0)} · total {formatCurrency(c.amount ?? 0)} · P.FACT{' '}
+                      {c.pFact || '—'}
+                    </small>
+                  )}
                   <details>
                     <summary>Origen del registro</summary>
                     <p>
                       {c.sourceRow != null
-                        ? ['REPORTE!', c.sourceRow, ' · ', c.name]
+                        ? [
+                            c.source,
+                            ' · ',
+                            c.sourceSheet ?? 'REPORTE',
+                            '!',
+                            c.sourceRow,
+                            c.sourceFile ? ' · ' + c.sourceFile : '',
+                            ' · ',
+                            c.name,
+                          ]
                         : [c.source || 'Seguimiento', ' · ', c.name]}
                     </p>
                     <p>
@@ -931,15 +939,15 @@ export function TrackingPanel({ inputs: a, startDate: s, onAudit: t }) {
                 </article>
               ))}
               <div className="pagination">
-                <button disabled={ue === 1} onClick={() => Oe(ue - 1)}>
+                <button disabled={detailPage === 1} onClick={() => setDetailPage(detailPage - 1)}>
                   Anterior
                 </button>
                 <span>
-                  {ue}
+                  {detailPage}
                   {' / '}
-                  {Math.ceil(se.length / 30)}
+                  {Math.ceil(detailRows.length / 30)}
                 </span>
-                <button disabled={ue * 30 >= se.length} onClick={() => Oe(ue + 1)}>
+                <button disabled={detailPage * 30 >= detailRows.length} onClick={() => setDetailPage(detailPage + 1)}>
                   Siguiente
                 </button>
               </div>

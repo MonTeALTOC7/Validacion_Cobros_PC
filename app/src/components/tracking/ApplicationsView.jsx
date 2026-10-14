@@ -5,54 +5,43 @@ import { APPLICATION_STATUS_LABELS, clipEpisodesToRows, ruleKey } from '../../en
 import { normalizeText } from '../../engine/normalize';
 import { laborDisplayName, sumUnits } from '../../engine/tracking';
 import { downloadBlob, formatNumber } from '../../lib/format';
-
-export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings: n, onOpen: i }) {
-  const [r, l] = useState('all');
-  const [o, x] = useState('all');
-  const [m, f] = useState('');
-  const [S, A] = useState(1);
-  const [E, D] = useState('');
-  const I = [...new Map(s.map((j) => [ruleKey(j), j])).entries()].sort(
+export function ApplicationsView({ episodes, rows, settings, onSettings, onOpen }) {
+  const [ruleFilter, setRuleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [selectedSeries, setSelectedSeries] = useState('');
+  const ruleChoices = [...new Map(rows.map((j) => [ruleKey(j), j])).entries()].sort(
     ([, j], [, w]) => j.labor.localeCompare(w.labor) || j.service.localeCompare(w.service),
   );
-  const v = s.filter((j) => r === 'all' || ruleKey(j) === r);
-  const N = clipEpisodesToRows(a, v).filter(
+  const ruleRows = rows.filter((j) => ruleFilter === 'all' || ruleKey(j) === ruleFilter);
+  const visibleEpisodes = clipEpisodesToRows(episodes, ruleRows).filter(
     (j) =>
-      !m ||
-      normalizeText(j.rows[0].producer + ' ' + j.rows[0].hacienda + ' ' + j.rows[0].suerte).includes(
-        normalizeText(m),
-      ),
+      !search ||
+      normalizeText(j.rows[0].producer + ' ' + j.rows[0].hacienda + ' ' + j.rows[0].suerte).includes(normalizeText(search)),
   );
-  const g = (j, w) =>
+  const matchesStatus = (j, w) =>
     w === 'all' || (w === 'unknown' ? ['SIN_AREA', 'NO_HA', 'REVISAR'].includes(j.status) : j.status === w);
-  const d = (j) =>
-    JSON.stringify([
-      j.rows[0].hacienda,
-      j.rows[0].suerte,
-      j.rows[0].labor,
-      j.rows[0].service,
-      j.rows[0].unit,
-      j.rows[0].source,
-    ]);
-  const R = N.filter((j) => g(j, o) && (!E || d(j) === E)).sort((j, w) =>
-    E ? j.sequence - w.sequence : w.start.localeCompare(j.start),
-  );
-  const O = new Map();
-  R.forEach((j) => {
-    const w = d(j);
-    O.set(w, [...(O.get(w) ?? []), j]);
+  const seriesKey = (j) =>
+    JSON.stringify([j.rows[0].hacienda, j.rows[0].suerte, j.rows[0].labor, j.rows[0].service, j.rows[0].unit, j.rows[0].source]);
+  const filteredEpisodes = visibleEpisodes
+    .filter((j) => matchesStatus(j, statusFilter) && (!selectedSeries || seriesKey(j) === selectedSeries))
+    .sort((j, w) => (selectedSeries ? j.sequence - w.sequence : w.start.localeCompare(j.start)));
+  const seriesMap = new Map();
+  filteredEpisodes.forEach((j) => {
+    const w = seriesKey(j);
+    seriesMap.set(w, [...(seriesMap.get(w) ?? []), j]);
   });
-  const C = [...O].sort(
+  const seriesList = [...seriesMap].sort(
     ([, j], [, w]) =>
-      j[0].rows[0].hacienda.localeCompare(w[0].rows[0].hacienda) ||
-      j[0].rows[0].suerte.localeCompare(w[0].rows[0].suerte),
+      j[0].rows[0].hacienda.localeCompare(w[0].rows[0].hacienda) || j[0].rows[0].suerte.localeCompare(w[0].rows[0].suerte),
   );
-  const y = Math.max(1, Math.ceil(C.length / 12));
-  const _ = Math.min(S, y);
-  const P = Math.max(1, Math.ceil(R.length / 12));
-  const h = Math.min(S, P);
-  const L = (j) => N.filter((w) => g(w, j)).length;
-  const F = () => {
+  const seriesPages = Math.max(1, Math.ceil(seriesList.length / 12));
+  const currentSeriesPage = Math.min(page, seriesPages);
+  const episodePages = Math.max(1, Math.ceil(filteredEpisodes.length / 12));
+  const currentEpisodePage = Math.min(page, episodePages);
+  const countByStatus = (j) => visibleEpisodes.filter((w) => matchesStatus(w, j)).length;
+  const exportCsv = () => {
     const j = (z) =>
       '"' +
       String(z ?? '')
@@ -82,7 +71,7 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
         'Tolerancia %',
         'Observaciones',
       ],
-      ...R.map((z) => {
+      ...filteredEpisodes.map((z) => {
         const B = z.rows[0];
         return [
           B.producer,
@@ -129,7 +118,7 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
           <h3>Aplicaciones y avance por suerte</h3>
           <p>Conteo estimado por labor y servicio. Abra un grupo para comprobar las fechas y cantidades.</p>
         </div>
-        <button className="button secondary" onClick={F}>
+        <button className="button secondary" onClick={exportCsv}>
           <Download size={16} />
           Exportar
         </button>
@@ -138,16 +127,16 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
         <label>
           Labor / servicio
           <select
-            value={r}
+            value={ruleFilter}
             onChange={(j) => {
-              l(j.target.value);
-              x('all');
-              D('');
-              A(1);
+              setRuleFilter(j.target.value);
+              setStatusFilter('all');
+              setSelectedSeries('');
+              setPage(1);
             }}
           >
             <option value="all">Todas las labores</option>
-            {I.map(([j, w]) => (
+            {ruleChoices.map(([j, w]) => (
               <option key={j} value={j}>
                 {w.labor}
                 {' · '}
@@ -161,11 +150,11 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
         <label>
           Buscar productor o suerte
           <input
-            value={m}
+            value={search}
             onChange={(j) => {
-              f(j.target.value);
-              D('');
-              A(1);
+              setSearch(j.target.value);
+              setSelectedSeries('');
+              setPage(1);
             }}
             placeholder="Nombre, hacienda o suerte…"
           />
@@ -182,31 +171,31 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
           <button
             key={j}
             className={'application-kpi ' + z}
-            aria-pressed={o === j}
+            aria-pressed={statusFilter === j}
             onClick={() => {
-              x(j);
-              D('');
-              A(1);
+              setStatusFilter(j);
+              setSelectedSeries('');
+              setPage(1);
             }}
           >
-            <strong>{L(j)}</strong>
+            <strong>{countByStatus(j)}</strong>
             <span>{w}</span>
             <small>Ver detalle →</small>
           </button>
         ))}
       </div>
       <p className="application-caption">
-        {new Set(N.map((j) => j.rows[0].hacienda + '|' + j.rows[0].suerte)).size}
+        {new Set(visibleEpisodes.map((j) => j.rows[0].hacienda + '|' + j.rows[0].suerte)).size}
         {
           ' suertes · Los conteos son grupos, no hectáreas ni suertes únicas. “Área completa” compara cantidades; no confirma cobertura física.'
         }
       </p>
-      {E ? (
+      {selectedSeries ? (
         <button
           className="exec-more"
           onClick={() => {
-            D('');
-            A(1);
+            setSelectedSeries('');
+            setPage(1);
           }}
         >
           ← Volver a todas las suertes y labores
@@ -216,9 +205,7 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
           <div className="panel-head">
             <div>
               <h3>Número de aplicaciones por suerte</h3>
-              <p>
-                Una fila por suerte, labor, servicio y unidad. Seleccione para ver cada aplicación estimada.
-              </p>
+              <p>Una fila por suerte, labor, servicio y unidad. Seleccione para ver cada aplicación estimada.</p>
             </div>
           </div>
           <div className="table-wrap">
@@ -234,18 +221,18 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
                 </tr>
               </thead>
               <tbody>
-                {C.slice((_ - 1) * 12, _ * 12).map(([j, w]) => {
+                {seriesList.slice((currentSeriesPage - 1) * 12, currentSeriesPage * 12).map(([j, w]) => {
                   const z = w[0].rows[0];
                   return (
                     <tr
                       key={j}
                       tabIndex={0}
                       onClick={() => {
-                        D(j);
-                        A(1);
+                        setSelectedSeries(j);
+                        setPage(1);
                       }}
                       onKeyDown={(B) => {
-                        (B.key === 'Enter' || B.key === ' ') && (B.preventDefault(), D(j), A(1));
+                        (B.key === 'Enter' || B.key === ' ') && (B.preventDefault(), setSelectedSeries(j), setPage(1));
                       }}
                     >
                       <td>
@@ -265,12 +252,8 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
                         <small>{z.unit}</small>
                       </td>
                       <td>{w.length}</td>
-                      <td>
-                        {z.unit === 'HA' ? w.filter((B) => B.status === 'COMPLETA').length : 'No aplica'}
-                      </td>
-                      <td>
-                        {z.unit === 'HA' ? w.filter((B) => B.status === 'PARCIAL').length : 'No aplica'}
-                      </td>
+                      <td>{z.unit === 'HA' ? w.filter((B) => B.status === 'COMPLETA').length : 'No aplica'}</td>
+                      <td>{z.unit === 'HA' ? w.filter((B) => B.status === 'PARCIAL').length : 'No aplica'}</td>
                       <td>
                         {w.filter((B) => !['COMPLETA', 'PARCIAL'].includes(B.status)).length}
                         {' →'}
@@ -281,29 +264,29 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
               </tbody>
             </table>
           </div>
-          {y > 1 && (
+          {seriesPages > 1 && (
             <div className="pagination">
-              <button disabled={_ === 1} onClick={() => A(_ - 1)}>
+              <button disabled={currentSeriesPage === 1} onClick={() => setPage(currentSeriesPage - 1)}>
                 Anterior
               </button>
               <span>
-                {_}
+                {currentSeriesPage}
                 {' / '}
-                {y}
+                {seriesPages}
                 {' · '}
-                {C.length}
+                {seriesList.length}
                 {' series'}
               </span>
-              <button disabled={_ === y} onClick={() => A(_ + 1)}>
+              <button disabled={currentSeriesPage === seriesPages} onClick={() => setPage(currentSeriesPage + 1)}>
                 Siguiente
               </button>
             </div>
           )}
         </section>
       )}
-      {E && (
+      {selectedSeries && (
         <div className="application-list">
-          {R.slice((h - 1) * 12, h * 12).map((j) => {
+          {filteredEpisodes.slice((currentEpisodePage - 1) * 12, currentEpisodePage * 12).map((j) => {
             const w = j.rows[0];
             return (
               <details key={j.id} className="application-lot">
@@ -358,11 +341,7 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
                     </span>
                     <span>
                       {j.equivalent !== null && j.equivalent > 1 ? 'Sobre el área' : 'Falta para el área'}
-                      <b>
-                        {j.area && w.unit === 'HA'
-                          ? formatNumber(Math.abs(j.area - j.quantity)) + ' HA'
-                          : 'No aplica'}
-                      </b>
+                      <b>{j.area && w.unit === 'HA' ? formatNumber(Math.abs(j.area - j.quantity)) + ' HA' : 'No aplica'}</b>
                     </span>
                     <span>
                       Grupo dentro de esta serie
@@ -378,9 +357,7 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
                   {w.unit === 'HA' && j.area && (
                     <div
                       className="application-progress"
-                      aria-label={
-                        'Área reportada ' + formatNumber((j.quantity / j.area) * 100, 1) + ' por ciento'
-                      }
+                      aria-label={'Área reportada ' + formatNumber((j.quantity / j.area) * 100, 1) + ' por ciento'}
                     >
                       <i
                         style={{
@@ -394,8 +371,7 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
                       {'El filtro incluye '}
                       {formatNumber(sumUnits(j.visible))} {w.unit}
                       {' de este grupo. Su estado usa el grupo completo ('}
-                      {formatNumber(j.quantity)} {w.unit}) para no confundir un recorte con una aplicación
-                      parcial.
+                      {formatNumber(j.quantity)} {w.unit}) para no confundir un recorte con una aplicación parcial.
                     </p>
                   )}
                   <ul>
@@ -413,7 +389,7 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
                     {' días si se alcanzó el área; tolerancia ±'}
                     {j.rule.tolerancePct}%.
                   </p>
-                  <button className="button secondary" onClick={() => i(j.rows)}>
+                  <button className="button secondary" onClick={() => onOpen(j.rows)}>
                     {'Ver '}
                     {j.rows.length}
                     {' registros del grupo completo'}
@@ -425,30 +401,28 @@ export function ApplicationsView({ episodes: a, rows: s, settings: t, onSettings
           })}
         </div>
       )}
-      {!R.length && (
-        <p className="exec-empty">
-          No hay grupos para esta selección. Cambie los filtros o seleccione “Grupos con trabajo”.
-        </p>
+      {!filteredEpisodes.length && (
+        <p className="exec-empty">No hay grupos para esta selección. Cambie los filtros o seleccione “Grupos con trabajo”.</p>
       )}
-      {E && P > 1 && (
+      {selectedSeries && episodePages > 1 && (
         <div className="pagination">
-          <button disabled={h === 1} onClick={() => A(h - 1)}>
+          <button disabled={currentEpisodePage === 1} onClick={() => setPage(currentEpisodePage - 1)}>
             Anterior
           </button>
           <span>
-            {h}
+            {currentEpisodePage}
             {' / '}
-            {P}
+            {episodePages}
             {' · '}
-            {R.length}
+            {filteredEpisodes.length}
             {' grupos'}
           </span>
-          <button disabled={h === P} onClick={() => A(h + 1)}>
+          <button disabled={currentEpisodePage === episodePages} onClick={() => setPage(currentEpisodePage + 1)}>
             Siguiente
           </button>
         </div>
       )}
-      <ApplicationRulesEditor key={JSON.stringify(t)} settings={t} choices={I} onSettings={n} />
+      <ApplicationRulesEditor key={JSON.stringify(settings)} settings={settings} choices={ruleChoices} onSettings={onSettings} />
     </section>
   );
 }

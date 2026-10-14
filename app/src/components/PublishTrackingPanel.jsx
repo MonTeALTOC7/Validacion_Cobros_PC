@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { buildTrackingRows } from '../engine/tracking';
 
-export function PublishTrackingPanel({ inputs: a, startDate: s }) {
+export function PublishTrackingPanel({ inputs, startDate }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const TOK = 'casur-gh-publish-token';
@@ -9,9 +9,7 @@ export function PublishTrackingPanel({ inputs: a, startDate: s }) {
   const PATH = 'modules/labores/data/seguimiento.json';
   const [hasTok, setHasTok] = useState(() => !!localStorage.getItem(TOK));
   const cfg = () => {
-    const v = prompt(
-      'Token de GitHub (permiso de contenidos sobre ' + REPO + '). Se guarda solo en este dispositivo.',
-    );
+    const v = prompt('Token de GitHub (permiso de contenidos sobre ' + REPO + '). Se guarda solo en este dispositivo.');
     if (v) {
       localStorage.setItem(TOK, v.trim());
       setHasTok(true);
@@ -32,11 +30,12 @@ export function PublishTrackingPanel({ inputs: a, startDate: s }) {
     setBusy(true);
     setMsg('Publicando…');
     try {
-      const rows = buildTrackingRows(a, s).map((r) => ({
+      const rows = buildTrackingRows(inputs, startDate).map((r) => ({
         id: r.id,
         source: r.source,
         date: r.date,
         week: r.week,
+        year: r.year,
         producer: r.producer,
         hacienda: r.hacienda,
         suerte: r.suerte,
@@ -117,10 +116,7 @@ export function PublishTrackingPanel({ inputs: a, startDate: s }) {
       }}
     >
       <h3>Publicar Seguimiento</h3>
-      <p>
-        Genera el dataset público sanitizado (sin tarifas, montos ni P.FACT) y lo publica para todos los
-        dispositivos.
-      </p>
+      <p>Genera el dataset público sanitizado (sin tarifas, montos ni P.FACT) y lo publica para todos los dispositivos.</p>
       <div
         style={{
           display: 'flex',

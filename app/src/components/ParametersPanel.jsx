@@ -1,67 +1,74 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { DEFAULT_PARAMETERS } from '../engine/constants';
+import { cleanCode, normalizeSuerte, normalizeText } from '../engine/normalize';
 
-export function ParametersPanel({ parameters: a, setParameters: s, onSave: t }) {
-  const [n, i] = useState(a);
-  useEffect(() => i(a), [a]);
-  const r = (l, o, x) => (
+/** Normaliza "P.FACT|HACIENDA|SUERTE" igual que el motor (sin tildes, mayúsculas, suerte con 2 dígitos). */
+const normalizeException = (line) => {
+  const [pFact, hacienda, suerte] = line.split('|');
+  return `${cleanCode(pFact)}|${normalizeText(hacienda)}|${normalizeSuerte(suerte)}`;
+};
+
+const EXCEPTION_PATTERN = /^[^|]+\|[^|]+\|[^|]+$/;
+
+export function ParametersPanel({ parameters, onSave }) {
+  const [draft, setDraft] = useState(parameters);
+  const [exceptionsText, setExceptionsText] = useState((parameters.tpsConfirmedExceptions ?? []).join('\n'));
+  useEffect(() => {
+    setDraft(parameters);
+    setExceptionsText((parameters.tpsConfirmedExceptions ?? []).join('\n'));
+  }, [parameters]);
+
+  const exceptionLines = exceptionsText
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const invalidExceptions = exceptionLines.filter((line) => !EXCEPTION_PATTERN.test(line));
+
+  const numberField = (name, label, help, step = '0.01') => (
     <label className="field">
       <span>
-        {o}
-        <small>{x}</small>
+        {label}
+        <small>{help}</small>
       </span>
       <input
         type="number"
         min="0"
-        step="0.01"
-        value={String(n[l])}
-        onChange={(m) =>
-          i({
-            ...n,
-            [l]: Number(m.target.value),
-          })
-        }
+        step={step}
+        value={String(draft[name])}
+        onChange={(event) => setDraft({ ...draft, [name]: Number(event.target.value) })}
       />
     </label>
   );
+
   return (
     <section className="panel settings-panel">
       <div className="panel-head">
         <div>
           <h2>Reglas editables</h2>
-          <p>Los cambios quedan guardados en este dispositivo y exigen volver a ejecutar la conciliación.</p>
+          <p>
+            Los cambios quedan guardados en este dispositivo, se registran en la auditoría y exigen volver a ejecutar la
+            conciliación. Un cambio de parámetros invalida los cierres vigentes.
+          </p>
         </div>
       </div>
       <div className="settings-group">
         <h3>Período y alcance</h3>
         <label className="field">
           <span>
-            Fecha inicial<small>Diciembre de 2025 podrá cargarse después.</small>
+            Fecha inicial
+            <small>Se ajusta al inicio de su semana operativa SIAGRI para no partir semanas.</small>
           </span>
           <input
             type="date"
-            value={n.startDate}
-            onChange={(l) =>
-              i({
-                ...n,
-                startDate: l.target.value,
-              })
-            }
+            value={draft.startDate}
+            onChange={(event) => setDraft({ ...draft, startDate: event.target.value })}
           />
         </label>
         <label className="field">
           <span>
             Alcance de tenencia<small>Productores es el universo principal de cobro.</small>
           </span>
-          <select
-            value={n.scope}
-            onChange={(l) =>
-              i({
-                ...n,
-                scope: l.target.value,
-              })
-            }
-          >
+          <select value={draft.scope} onChange={(event) => setDraft({ ...draft, scope: event.target.value })}>
             <option value="PRODUCERS">Productores</option>
             <option value="INTERNAL">CASUR interno</option>
             <option value="BOTH">Ambos universos</option>
@@ -70,44 +77,66 @@ export function ParametersPanel({ parameters: a, setParameters: s, onSave: t }) 
       </div>
       <div className="settings-group">
         <h3>Ventana de siembra TPS</h3>
-        {r('tpsWeeksBefore', 'Semanas anteriores', 'Recomendado: 2')}
-        {r('tpsWeeksAfter', 'Semanas posteriores', 'Recomendado: 1')}
+        {numberField('tpsWeeksBefore', 'Semanas anteriores', 'Recomendado: 2', '1')}
+        {numberField('tpsWeeksAfter', 'Semanas posteriores', 'Recomendado: 1', '1')}
       </div>
       <div className="settings-group">
         <h3>Tolerancias por unidad</h3>
-        {r('toleranceDH', 'D-H', 'Diferencia máxima aceptada')}
-        {r('toleranceHA', 'HA', 'Diferencia máxima aceptada')}
-        {r('toleranceMJO', 'MJO', 'Diferencia máxima aceptada')}
-        {r('tolerancePAQ', 'PAQ', 'Diferencia máxima aceptada')}
+        {numberField('toleranceDH', 'D-H', 'Diferencia máxima aceptada')}
+        {numberField('toleranceHA', 'HA', 'Diferencia máxima aceptada')}
+        {numberField('toleranceMJO', 'MJO', 'Diferencia máxima aceptada')}
+        {numberField('tolerancePAQ', 'PAQ', 'Diferencia máxima aceptada')}
+      </div>
+      <div className="settings-group">
+        <h3>Tarifas</h3>
+        {numberField(
+          'atypicalTariffPct',
+          'Umbral de tarifa poco frecuente (%)',
+          'Se marca la tarifa que aparece en menos de este porcentaje de las filas de su servicio y UM. Indicador para revisar.',
+          '0.5',
+        )}
+      </div>
+      <div className="settings-group">
+        <h3>TPS confirmados por negocio</h3>
+        <label className="field field-wide">
+          <span>
+            Excepciones (una por línea)
+            <small>Formato P.FACT|HACIENDA|SUERTE. Se aceptan aunque la evidencia RYA de Nómina esté incompleta.</small>
+          </span>
+          <textarea rows={5} value={exceptionsText} onChange={(event) => setExceptionsText(event.target.value)} />
+        </label>
+        {invalidExceptions.length > 0 && <p role="alert">Formato inválido: {invalidExceptions.join(', ')}</p>}
       </div>
       <label className="toggle">
         <input
           type="checkbox"
-          checked={n.includeHistoricalInactive}
-          onChange={(l) =>
-            i({
-              ...n,
-              includeHistoricalInactive: l.target.checked,
-            })
-          }
+          checked={draft.includeHistoricalInactive}
+          onChange={(event) => setDraft({ ...draft, includeHistoricalInactive: event.target.checked })}
         />
         <span />
         <div>
           <strong>Incluir suertes históricas dadas de baja</strong>
-          <small>Sus cobros continúan siendo válidos aunque no aparezcan en el Maestro actual.</small>
+          <small>
+            Activado: sus cobros se validan por hacienda aunque la suerte no esté en el Maestro actual. Desactivado: se marcan
+            “Lote no encontrado” para revisión.
+          </small>
         </div>
       </label>
       <div className="settings-actions">
         <button
           className="button ghost"
           onClick={() => {
-            i(DEFAULT_PARAMETERS);
-            s(DEFAULT_PARAMETERS);
+            setDraft(DEFAULT_PARAMETERS);
+            setExceptionsText(DEFAULT_PARAMETERS.tpsConfirmedExceptions.join('\n'));
           }}
         >
           Restaurar recomendados
         </button>
-        <button className="button primary" onClick={() => t(n)}>
+        <button
+          className="button primary"
+          disabled={invalidExceptions.length > 0}
+          onClick={() => onSave({ ...draft, tpsConfirmedExceptions: exceptionLines.map(normalizeException) })}
+        >
           Guardar parámetros
         </button>
       </div>
