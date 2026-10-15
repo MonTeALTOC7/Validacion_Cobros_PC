@@ -224,6 +224,7 @@ export function App() {
                 ready={app.ready}
                 startDate={parameters.startDate}
                 quality={app.quality}
+                atypicalTariffPct={parameters.atypicalTariffPct}
                 masterSource={app.masterSource}
                 remoteMaster={app.remoteMaster}
                 published={app.published}

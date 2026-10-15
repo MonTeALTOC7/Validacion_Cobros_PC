@@ -578,3 +578,176 @@ td.num {
 .summary-grid .pending-breakdown {
   grid-column: 1 / -1;
 }
+
+/* Detalle navegable (drill-down v0.9): ruta, Volver, pestañas y fichas. Reutiliza .drawer y .detail-grid. */
+.drill-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  gap: 12px;
+  align-items: flex-start;
+}
+.drill-head-main {
+  min-width: 0;
+}
+.drill-head-main h2 {
+  overflow-wrap: anywhere;
+}
+.drill-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.drill-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #ffffff55 !important;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.drill-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-top: 6px;
+}
+.drill-crumbs > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #b9d3c9;
+}
+.drill-crumbs button {
+  border: 0;
+  background: transparent;
+  color: #dcebe5;
+  font-size: 12px;
+  padding: 0 2px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drill-section h3 {
+  font-size: 13px;
+  margin: 20px 0 8px;
+}
+.drill-tiles {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+.drill-tiles .detail strong,
+.drill-fields .detail strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.drill-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.drill-units {
+  font-size: 12px;
+  margin: 0 0 10px;
+  font-variant-numeric: tabular-nums;
+}
+.drill-units span {
+  color: var(--muted);
+  margin-right: 4px;
+}
+.drill-apply {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.drill-apply small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.drill-tabs {
+  margin-top: 0;
+}
+.drill-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+}
+.drill-search input {
+  border: 0;
+  outline: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+.drill-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 6px 0 10px;
+}
+.drill-list {
+  font-size: 12px;
+  padding-left: 18px;
+}
+.drill-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  margin: 16px 0 8px;
+}
+.drill-undo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.finance-duplicates .link-button {
+  white-space: nowrap;
+}
+.quality-actions {
+  margin: 6px 0 0;
+}
+/* En el teléfono el detalle ocupa toda la pantalla. */
+@media (max-width: 650px) {
+  .drawer.drill-drawer {
+    width: 100vw;
+    box-shadow: none;
+  }
+  .drill-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .drill-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .drill-back span {
+    display: none;
+  }
+}
+/* Dentro del detalle las tablas se ajustan al panel (la regla global fija 1080 px); el texto largo salta de línea. */
+.drill-drawer table {
+  min-width: 0;
+}
+.drill-drawer .data-table td {
+  white-space: normal;
+}
+.drill-drawer .data-table td.num {
+  white-space: nowrap;
+}
+.drill-drawer .data-table td:first-child {
+  min-width: 12ch;
+  max-width: 26ch;
+}
+.drill-drawer .drill-wrap {
+  display: block;
+  min-width: 14ch;
+  max-width: 32ch;
+}

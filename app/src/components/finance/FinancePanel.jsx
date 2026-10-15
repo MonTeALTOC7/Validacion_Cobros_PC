@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Download, Landmark, Search, X } from 'lucide-react';
+import { Download, Landmark, Search, Undo2 } from 'lucide-react';
 import { DataTable } from '../common/DataTable';
 import { Metric, ShareBar } from '../common';
 import {
@@ -16,11 +16,13 @@ import {
 import { isBlockingPending } from '../../engine/indicators';
 import { normalizeText } from '../../engine/normalize';
 import { comparePeriods } from '../../engine/periods';
-import { buildTariffProfile } from '../../engine/tariffs';
+import { buildTariffProfile, tariffKey, tariffValueKey } from '../../engine/tariffs';
 import { classifyRepetitions } from '../../engine/repetitions';
 import { formatCurrency, formatNumber } from '../../lib/format';
 import { periodLongText, periodText, percentText } from '../../lib/labels';
 import { exportSheetsToExcel } from '../../lib/sheet';
+import { payrollIndex } from '../../lib/drill';
+import { FinanceDrill, groupLevel } from './FinanceDrill';
 
 const SCOPE_LABELS = { PRODUCERS: 'Productores', INTERNAL: 'CASUR interno', BOTH: 'Ambos universos' };
 
@@ -55,7 +57,9 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
   });
   const [producerDimension, setProducerDimension] = useState('producer');
   const [laborDimension, setLaborDimension] = useState('service');
-  const [detail, setDetail] = useState(null);
+  // Pila del detalle (null = cerrado) y último "Aplicar como filtro" para poder deshacerlo.
+  const [drill, setDrill] = useState(null);
+  const [applied, setApplied] = useState(null);
 
   const setFilter = (name, value) => setFilters((current) => ({ ...current, [name]: value }));
   const options = useMemo(
@@ -88,10 +92,27 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
 
   const summary = useMemo(() => financeSummary(rows), [rows]);
   // Posibles duplicados dentro de la vista filtrada: se informan aparte y NO se descuentan del total.
-  const repetitions = useMemo(() => {
+  const repetitionView = useMemo(() => {
     const billedIds = new Set(rows.map((row) => row.id));
-    return classifyRepetitions(inputs.prefactura.filter((row) => billedIds.has(row.id))).summary;
+    return classifyRepetitions(inputs.prefactura.filter((row) => billedIds.has(row.id)));
   }, [rows, inputs.prefactura]);
+  const repetitions = repetitionView.summary;
+  // Contexto del detalle: mismas filas que la página, más el origen de cada línea y la Nómina por clave.
+  const drillContext = useMemo(
+    () => ({
+      allRows,
+      baseFilters: filters,
+      multiYear,
+      prefactura: inputs.prefactura,
+      prefacturaById: new Map(inputs.prefactura.map((row) => [row.id, row])),
+      repetitions: classifyRepetitions(inputs.prefactura),
+      findingByPrefacturaId: new Map(
+        (analysis?.findings ?? []).flatMap((finding) => (finding.prefacturaRowIds ?? []).map((id) => [id, finding])).reverse(),
+      ),
+      payrollByKey: payrollIndex(inputs.payroll),
+    }),
+    [allRows, filters, multiYear, inputs.prefactura, inputs.payroll, analysis],
+  );
   const pending = useMemo(
     () => (analysis ? pendingByProducer(analysis.findings, allRows, isBlockingPending) : new Map()),
     [analysis, allRows],
@@ -131,8 +152,30 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
     key === 'search' || key === 'from' || key === 'to' ? !!value : value !== 'all',
   ).length;
 
-  const openDetail = (title, subset) => setDetail({ title, rows: subset });
   const rowsFor = (dimension, key) => rows.filter((row) => FINANCE_DIMENSIONS[dimension].keyOf(row) === key);
+  /** Abre el detalle de un grupo de la página (productor, finca, suerte, labor, servicio, semana, P.FACT). */
+  const openGroup = (dimension, key, title) =>
+    setDrill([groupLevel({ title, rows: rowsFor(dimension, key), path: [{ dimension, key, label: title }] })]);
+  /** Abre el detalle de un indicador: las mismas filas con las que se calcula. */
+  const openRoot = (title, subset, tab, noFilterReason = '') =>
+    setDrill([groupLevel({ title, rows: subset, tab, noFilterReason })]);
+  const openTariff = (profile, value) =>
+    openRoot(
+      `${profile.service} · ${profile.unit} · tarifa ${formatNumber(value.tariff)}`,
+      // Mismo criterio de agrupación que la tabla de tarifas (servicio|UM y tarifa a 2 decimales).
+      rows.filter((row) => tariffKey(row) === profile.key && tariffValueKey(row.tariff) === tariffValueKey(value.tariff)),
+      'lines',
+      'Una tarifa no tiene filtro equivalente en la página.',
+    );
+  const applyFromDrill = (nextFilters, title) => {
+    setApplied({ previous: filters, title });
+    setFilters(nextFilters);
+    setDrill(null);
+  };
+  const undoApplied = () => {
+    setFilters(applied.previous);
+    setApplied(null);
+  };
 
   const exportAll = () => {
     const groupSheet = (groups, labelName) =>
@@ -415,7 +458,8 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
         <button
           className="exec-reset"
           disabled={!activeFilters}
-          onClick={() =>
+          onClick={() => {
+            setApplied(null);
             setFilters({
               from: '',
               to: '',
@@ -425,11 +469,16 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
               contractor: 'all',
               universe: 'all',
               search: '',
-            })
-          }
+            });
+          }}
         >
           Restablecer {activeFilters ? `(${activeFilters})` : ''}
         </button>
+        {applied && (
+          <button className="exec-reset drill-undo" onClick={undoApplied} title="Vuelve a los filtros anteriores">
+            <Undo2 size={14} /> Deshacer filtro de “{applied.title}”
+          </button>
+        )}
       </div>
 
       <div className="metric-grid">
@@ -438,21 +487,32 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
           value={money(overall.total)}
           note={`${overall.rows.toLocaleString('es-NI')} líneas de prefactura · columna Total, sin descontar posibles duplicados`}
           tone="primary"
+          onClick={() => openRoot('Total informado por SIAGRI', rows, 'producer')}
         />
         <Metric
           label="Prefacturas"
           value={overall.invoices.toLocaleString('es-NI')}
           note={`${overall.producers} productores · ${overall.haciendas} fincas`}
+          onClick={() => openRoot('Prefacturas de la vista', rows, 'invoice')}
         />
         <Metric
           label="Prefacturado por ha de suerte"
           value={perHaText(overall.perHa)}
           note={`Monto de Prefactura ÷ ${formatNumber(overall.area)} ha físicas (${overall.lotsWithArea} de ${overall.lots} suertes con área). No es el costo total de producción por hectárea.`}
+          onClick={() => openRoot('Prefacturado por suerte', rows, 'lot')}
         />
         <Metric
           label="Prefacturado por HA trabajada"
           value={perHaText(overall.perHaWorked)}
           note={`Monto de líneas con UM HA ÷ ${formatNumber(overall.haUnits)} HA de trabajo acumulado. No equivale a área física.`}
+          onClick={() =>
+            openRoot(
+              'Líneas con UM HA',
+              rows.filter((row) => row.unit === 'HA'),
+              'service',
+              'Las líneas con UM HA no tienen un filtro equivalente en la página.',
+            )
+          }
         />
         <Metric
           label={`Última semana · ${periodText(summary.lastPeriod?.key, multiYear)}`}
@@ -463,6 +523,11 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
               : `${lastChange >= 0 ? '+' : ''}${formatNumber(lastChange, 1)} % vs. semana anterior · promedio 4 sem. ${money(summary.lastFourAverage)}`
           }
           tone={lastChange != null && lastChange < 0 ? 'warning' : ''}
+          onClick={
+            summary.lastPeriod
+              ? () => openGroup('period', summary.lastPeriod.key, periodLongText(summary.lastPeriod.key, multiYear))
+              : undefined
+          }
         />
       </div>
 
@@ -475,8 +540,24 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
               ` · ${repetitions.COBRO_EN_OTRA_PREFACTURA.extraRows} cobro(s) repetido(s) en otra prefactura por ${money(repetitions.COBRO_EN_OTRA_PREFACTURA.extraAmount)}`}
             {repetitions.MISMA_CANTIDAD_TARIFA_DISTINTA.groups > 0 &&
               ` · ${repetitions.MISMA_CANTIDAD_TARIFA_DISTINTA.groups} grupo(s) con misma cantidad y tarifas distintas (revisar)`}
-            . Detalle en Actualizar archivos → Calidad de datos.
+            .
           </span>
+          <button
+            type="button"
+            className="link-button"
+            onClick={() =>
+              setDrill([
+                {
+                  kind: 'repetitions',
+                  title: 'Repeticiones en Prefactura',
+                  crumb: 'Repeticiones',
+                  groups: repetitionView.groups.filter((group) => group.kind !== 'VARIAS_LINEAS_MISMA_CLAVE'),
+                },
+              ])
+            }
+          >
+            Ver grupos y evidencia
+          </button>
         </div>
       )}
 
@@ -565,7 +646,7 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
                   <button
                     key={group.key}
                     aria-label={`${periodLongText(group.key, multiYear)}: ${money(group.total)}`}
-                    onClick={() => openDetail(`Prefacturas de ${periodLongText(group.key, true)}`, rowsFor('period', group.key))}
+                    onClick={() => openGroup('period', group.key, periodLongText(group.key, multiYear))}
                   >
                     <span className="exec-bar-track">
                       <i style={{ height: `${(Math.max(0, group.total) / maxPeriod) * 100}%` }} />
@@ -582,13 +663,13 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
               title="Principales productores"
               groups={summary.byProducer.slice(0, 10)}
               total={overall.total}
-              onOpen={(group) => openDetail(group.label, rowsFor('producer', group.key))}
+              onOpen={(group) => openGroup('producer', group.key, group.label)}
             />
             <RankingPanel
               title="Principales labores"
               groups={summary.byLabor.slice(0, 10)}
               total={overall.total}
-              onOpen={(group) => openDetail(group.label, rowsFor('labor', group.key))}
+              onOpen={(group) => openGroup('labor', group.key, group.label)}
             />
           </div>
           {pending.size > 0 && (
@@ -647,7 +728,7 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
             key={producerDimension}
             rows={producerGroups}
             columns={groupColumns(producerDimension === 'producer' ? 'Productor' : 'Finca', producerDimension === 'producer')}
-            onRowClick={(group) => openDetail(group.label, rowsFor(producerDimension, group.key))}
+            onRowClick={(group) => openGroup(producerDimension, group.key, group.label)}
           />
         </section>
       )}
@@ -671,7 +752,7 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
           <DataTable
             key={laborDimension}
             rows={laborGroups}
-            onRowClick={(group) => openDetail(group.label, rowsFor(laborDimension, group.key))}
+            onRowClick={(group) => openGroup(laborDimension, group.key, group.label)}
             columns={[
               {
                 key: 'label',
@@ -722,7 +803,7 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
           </div>
           <DataTable
             rows={lotGroups}
-            onRowClick={(group) => openDetail(group.label, rowsFor('lot', group.key))}
+            onRowClick={(group) => openGroup('lot', group.key, group.label)}
             columns={[
               { key: 'label', label: 'Finca · suerte', render: (group) => <strong>{group.label}</strong> },
               {
@@ -787,7 +868,13 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
               <tbody>
                 {tariffProfiles.flatMap((profile) =>
                   profile.values.map((value, index) => (
-                    <tr key={`${profile.key}-${value.tariff}`} className={index === 0 ? 'group-start' : ''}>
+                    <tr
+                      key={`${profile.key}-${value.tariff}`}
+                      className={`clickable ${index === 0 ? 'group-start' : ''}`}
+                      tabIndex={0}
+                      onClick={() => openTariff(profile, value)}
+                      onKeyDown={(event) => event.key === 'Enter' && openTariff(profile, value)}
+                    >
                       <td>
                         {index === 0 && (
                           <>
@@ -834,9 +921,7 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
           <DataTable
             rows={invoices}
             rowKey={(invoice) => invoice.key}
-            onRowClick={(invoice) =>
-              openDetail(`Prefactura ${invoice.pFact} · ${invoice.producerName}`, rowsFor('invoice', invoice.key))
-            }
+            onRowClick={(invoice) => openGroup('invoice', invoice.key, `Prefactura ${invoice.pFact} · ${invoice.producerName}`)}
             columns={[
               {
                 key: 'pFact',
@@ -873,7 +958,7 @@ export function FinancePanel({ inputs, analysis, startDate, parameters }) {
         </p>
       </footer>
 
-      {detail && <FinanceDetailDrawer detail={detail} multiYear={multiYear} onClose={() => setDetail(null)} />}
+      {drill && <FinanceDrill stack={drill} setStack={setDrill} context={drillContext} onApplyFilters={applyFromDrill} />}
     </div>
   );
 }
@@ -945,99 +1030,5 @@ function RankingPanel({ title, groups, total, onOpen }) {
         ))}
       </div>
     </section>
-  );
-}
-
-function FinanceDetailDrawer({ detail, multiYear, onClose }) {
-  const [tab, setTab] = useState('labor');
-  const rows = detail.rows;
-  const dimension = { labor: 'labor', suerte: 'lot', semana: 'period', factura: 'invoice' }[tab];
-  const groups = useMemo(() => {
-    const list = aggregateFinance(rows, FINANCE_DIMENSIONS[dimension].keyOf, FINANCE_DIMENSIONS[dimension].labelOf);
-    return dimension === 'period' ? list.sort((a, b) => comparePeriods(a.key, b.key)) : list;
-  }, [rows, dimension]);
-  const total = rows.reduce((sum, row) => sum + row.total, 0);
-  const max = Math.max(1, ...groups.map((group) => group.total));
-  return (
-    <>
-      <div className="drawer-overlay" onClick={onClose} />
-      <aside className="drawer drawer-wide" role="dialog" aria-modal="true" aria-label="Detalle financiero">
-        <div className="drawer-head">
-          <div>
-            <span>Detalle financiero · {rows.length} líneas</span>
-            <h2>{detail.title}</h2>
-          </div>
-          <button onClick={onClose} aria-label="Cerrar">
-            <X />
-          </button>
-        </div>
-        <div className="drawer-body">
-          <div className="detail-grid">
-            <div className="detail">
-              <span>Total</span>
-              <strong>{formatCurrency(total)}</strong>
-            </div>
-            <div className="detail">
-              <span>Prefacturas</span>
-              <strong>{new Set(rows.map((row) => row.invoiceKey)).size}</strong>
-            </div>
-            <div className="detail">
-              <span>Suertes</span>
-              <strong>{new Set(rows.map((row) => row.lot)).size}</strong>
-            </div>
-            <div className="detail">
-              <span>Semanas</span>
-              <strong>{new Set(rows.map((row) => row.period)).size}</strong>
-            </div>
-          </div>
-          <div className="segmented">
-            {[
-              ['labor', 'Por labor'],
-              ['suerte', 'Por suerte'],
-              ['semana', 'Por semana'],
-              ['factura', 'Por prefactura'],
-              ['lineas', 'Líneas'],
-            ].map(([id, label]) => (
-              <button key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>
-                {label}
-              </button>
-            ))}
-          </div>
-          {tab === 'lineas' ? (
-            <DataTable
-              rows={rows}
-              rowKey={(row) => row.id}
-              pageSize={30}
-              columns={[
-                { key: 'period', label: 'Semana', render: (row) => periodText(row.period, multiYear) },
-                { key: 'date', label: 'Fecha' },
-                { key: 'lot', label: 'Suerte', render: (row) => `${row.hacienda} · ${row.suerte}` },
-                { key: 'service', label: 'Servicio', render: (row) => `${row.labor} · ${row.service}` },
-                { key: 'units', label: 'Unidades', num: true, render: (row) => `${formatNumber(row.units)} ${row.unit}` },
-                { key: 'tariff', label: 'Tarifa', num: true, render: (row) => formatNumber(row.tariff) },
-                { key: 'total', label: 'Total', num: true, render: (row) => formatCurrency(row.total), total: sumTotal },
-                { key: 'pFact', label: 'P.FACT' },
-                { key: 'sourceRow', label: 'Fila', render: (row) => <code>{row.sourceRow}</code> },
-              ]}
-            />
-          ) : (
-            <div className="bar-list">
-              {groups.map((group) => (
-                <div key={group.key} className="bar-row static">
-                  <span>{dimension === 'period' ? periodLongText(group.key, multiYear) : group.label}</span>
-                  <ShareBar value={group.total} max={max} />
-                  <b>{formatCurrency(group.total)}</b>
-                  <small>
-                    {Object.entries(group.byUnit)
-                      .map(([unit, value]) => `${formatNumber(value.units)} ${unit}`)
-                      .join(' · ')}
-                  </small>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </aside>
-    </>
   );
 }
