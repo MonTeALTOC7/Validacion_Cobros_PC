@@ -20,23 +20,34 @@ const example = (source, row, detail) => ({
   date: row.date,
   lot: `${row.hacienda} · ${row.suerte}`,
   detail,
+  rowId: row.id,
 });
 
-const issue = (id, severity, title, detail, items) => ({
+/** Ejemplo tal como se publica en el informe (sin el id interno de la fila). */
+const publicExample = ({ rowId, ...rest }) => rest;
+
+/**
+ * Problema con hasta MAX_EXAMPLES ejemplos. Con `full`, agrega `items`: todos los registros afectados, cada uno con
+ * el id de su fila de origen (para la consulta de detalle). Sin `full` la salida es la de siempre.
+ */
+const issue = (id, severity, title, detail, items, full = false) => ({
   id,
   severity,
   title,
   detail,
   count: items.length,
-  examples: items.slice(0, MAX_EXAMPLES),
+  examples: items.slice(0, MAX_EXAMPLES).map(publicExample),
+  ...(full ? { items } : {}),
 });
 
 /**
  * @param inputs datos cargados (payroll, prefactura, master, files)
- * @param options { atypicalTariffPct }
- * @returns lista de problemas { id, severity, title, detail, count, examples[] }
+ * @param options { atypicalTariffPct, fullItems }: con fullItems, cada problema incluye todos sus registros (items).
+ * @returns lista de problemas { id, severity, title, detail, count, examples[], items[]? }
  */
 export const assessDataQuality = (inputs, options = {}) => {
+  const full = options.fullItems === true;
+  const issueOf = (...args) => issue(...args, full);
   const issues = [];
   const { payroll, prefactura, master, files } = inputs;
 
@@ -107,7 +118,7 @@ export const assessDataQuality = (inputs, options = {}) => {
     }
     if (outside.length) {
       issues.push(
-        issue(
+        issueOf(
           'date-outside-week',
           'warning',
           'Fechas fuera de su semana operativa',
@@ -118,7 +129,7 @@ export const assessDataQuality = (inputs, options = {}) => {
     }
     if (outsideInferred.length) {
       issues.push(
-        issue(
+        issueOf(
           'date-outside-inferred-week',
           'info',
           'Fechas fuera del rango inferido de su semana',
@@ -166,7 +177,7 @@ export const assessDataQuality = (inputs, options = {}) => {
     if (!summary.groups) continue;
     const rows = repetitions.groups.filter((group) => group.kind === kind).flatMap((group) => group.rows);
     issues.push({
-      ...issue(
+      ...issueOf(
         `repetition-${kind}`,
         severity,
         title(summary),
@@ -188,7 +199,7 @@ export const assessDataQuality = (inputs, options = {}) => {
   const noInvoice = prefactura.filter((row) => !row.pFact.trim());
   if (noInvoice.length) {
     issues.push(
-      issue(
+      issueOf(
         'prefactura-no-pfact',
         'critical',
         'Prefactura sin número P.FACT',
@@ -202,7 +213,7 @@ export const assessDataQuality = (inputs, options = {}) => {
   const badTotals = prefactura.filter((row) => Math.abs(round(row.tariff * row.units, 2) - row.total) > 0.02);
   if (badTotals.length) {
     issues.push(
-      issue(
+      issueOf(
         'prefactura-total',
         'warning',
         'Prefactura: Total distinto de Tarifa × Unidades',
@@ -223,7 +234,7 @@ export const assessDataQuality = (inputs, options = {}) => {
   const atypical = prefactura.filter((row) => isAtypicalTariff(profile, row));
   if (atypical.length) {
     issues.push(
-      issue(
+      issueOf(
         'tariff-atypical',
         'info',
         'Tarifas poco frecuentes',
@@ -256,7 +267,7 @@ export const assessDataQuality = (inputs, options = {}) => {
     }
     if (missing.size) {
       issues.push(
-        issue(
+        issueOf(
           'lots-missing',
           'info',
           `${missing.size} lote(s) sin coincidencia exacta en el Maestro`,
@@ -275,7 +286,7 @@ export const assessDataQuality = (inputs, options = {}) => {
   const inconsistent = [...namesByCode].filter(([, rows]) => new Set(rows.map((row) => row.hacienda)).size > 1);
   if (inconsistent.length) {
     issues.push(
-      issue(
+      issueOf(
         'hacienda-names',
         'critical',
         'Código de hacienda con nombres distintos',
