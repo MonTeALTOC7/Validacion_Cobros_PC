@@ -206,7 +206,7 @@ Sin cambios de reglas, importadores, montos ni interfaz.
 | **Comparación legacy** (`compare-legacy.mjs --allowlist`) | Diferencias con el bundle 8b3-1-1 fuera de la lista permitida (95: 24 transiciones S02, 4 etapas TPS informativas, 67 hallazgos con banderas informativas), o permitidas que dejan de aparecer. La lista solo admite diferencias que cumplen una regla documentada de `legacy-diff.js`. |
 | **App Maestra** (obligatoria) | Se examina en el commit fijado `MAESTRA_REF` (`938e809`) en solo lectura y sin credenciales persistidas. Falla si no puede leerse, si el commit no coincide o si no se ejecutan todas las comprobaciones (21 de compatibilidad y 10 de actualización). El resumen registra el commit y el SHA-256 de cada archivo examinado. |
 | **Pruebas de navegador** | `smoke` (52), `upgrade` (9 o 10) y `maestra-compat` (21) fallan también si no completan todas sus comprobaciones. |
-| **Acciones de GitHub** | `checkout`, `setup-node` y `upload-artifact` actualizadas a v5. |
+| **Acciones de GitHub** | `checkout` y `setup-node` v5, `upload-artifact` v6, todas sobre Node 24 (sin avisos de versión obsoleta). |
 | **Normalización** | El carácter literal U+FFFD de `normalizeText` se reemplaza por su escape `\uFFFD`; salida idéntica (prueba unitaria). |
 
 Observación (comportamiento previo, no modificado): los identificadores de fila "por contenido" dependen de la zona
