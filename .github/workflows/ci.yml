@@ -3,8 +3,10 @@
 # - Copia legacy de referencia idéntica a e7587c3.
 # - `npm run release` reproduce exactamente el build que está en la raíz (lo que sirve GitHub Pages) sin borrar
 #   archivos necesarios.
-# - Pruebas de navegador: humo (build y raíz), actualización desde v0.7 y comparación legacy (informe).
-# - Compatibilidad con la vista de labores de la App Maestra, si su repositorio es legible con el token de la CI.
+# - Cifras de referencia (golden) bloqueantes: resultados del motor sobre datos/ y registro justificado de cambios.
+# - Pruebas de navegador: humo (build y raíz), actualización desde v0.7 y comparación con el legacy contra la lista de
+#   diferencias permitidas (bloqueante).
+# - Compatibilidad obligatoria con la vista de labores de la App Maestra, examinada en un commit fijo (solo lectura).
 name: CI
 
 on:
@@ -15,6 +17,12 @@ on:
 
 permissions:
   contents: read
+
+env:
+  # Commit de la App Maestra examinado por la regresión de compatibilidad (referencia reproducible).
+  # Se actualiza a propósito, con un cambio visible en este archivo, cuando la App Maestra publique una versión nueva.
+  MAESTRA_REPO: MonTeALTOC7/negocios_de_cana_casur_app
+  MAESTRA_REF: 938e809a6e6ddae0f8e1c4c2f2f1500a5f6527dc
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -30,11 +38,11 @@ jobs:
     env:
       TZ: America/Managua
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # el historial permite comparar tests/legacy con el commit e7587c3
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -46,8 +54,19 @@ jobs:
       - name: Formato
         run: npx prettier --check src tests scripts
 
-      - name: Pruebas unitarias
+      - name: Pruebas unitarias y cifras de referencia (golden)
         run: npm test
+
+      - name: Registro de cifras de referencia (solo crece; cambios visibles)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            BASE="${{ github.event.before }}"
+          else
+            BASE=""
+          fi
+          node scripts/golden-guard.mjs "$BASE"
 
       - name: Copia legacy idéntica a la referencia
         run: |
@@ -79,34 +98,46 @@ jobs:
       - name: Actualización desde v0.7 en el mismo origen
         run: node tests/e2e/upgrade.mjs
 
-      - name: Comparación con el legacy (informe, no bloquea)
-        run: node tests/e2e/compare-legacy.mjs --report-only --out ../compare-legacy.json
+      - name: Comparación con el legacy (solo diferencias permitidas)
+        run: node tests/e2e/compare-legacy.mjs --allowlist tests/golden/legacy-allowlist.json --out ../compare-legacy.json
 
-      - name: Repositorio de la App Maestra (solo lectura)
-        id: maestra
-        continue-on-error: true
-        uses: actions/checkout@v4
+      - name: Repositorio de la App Maestra en el commit fijado (solo lectura)
+        uses: actions/checkout@v5
         with:
-          repository: MonTeALTOC7/negocios_de_cana_casur_app
+          repository: ${{ env.MAESTRA_REPO }}
+          ref: ${{ env.MAESTRA_REF }}
           path: maestra
           sparse-checkout: modules/labores
+          persist-credentials: false
 
-      - name: Compatibilidad con la vista de labores de la App Maestra
-        if: steps.maestra.outcome == 'success'
+      - name: Código de la App Maestra examinado
+        working-directory: maestra
+        run: |
+          HEAD_SHA=$(git rev-parse HEAD)
+          if [ "$HEAD_SHA" != "$MAESTRA_REF" ]; then echo "::error::Se esperaba $MAESTRA_REF y se obtuvo $HEAD_SHA"; exit 1; fi
+          test -f modules/labores/index.html && test -f modules/labores/data/seguimiento.json
+          {
+            echo "## App Maestra examinada"
+            echo ""
+            echo "- Repositorio: \`$MAESTRA_REPO\` · commit \`$HEAD_SHA\`"
+            echo "- SHA-256 de los archivos de \`modules/labores\`:"
+            echo '```'
+            find modules/labores -type f -not -path '*/datos/*' | sort | xargs sha256sum
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY" > ../maestra-ref.txt
+
+      - name: Compatibilidad con la vista de labores de la App Maestra (obligatoria)
         run: |
           node tests/e2e/upgrade.mjs --labores ../maestra/modules/labores
           npx vite-node tests/e2e/maestra-compat.mjs -- --labores ../maestra/modules/labores --out ../maestra-compat.json
 
-      - name: Aviso si la App Maestra no es legible
-        if: steps.maestra.outcome != 'success'
-        run: echo "::warning::No se pudo leer el repositorio de la App Maestra con el token de la CI; la regresión de compatibilidad se omitió."
-
       - name: Informes
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: informes
           path: |
             compare-legacy.json
             maestra-compat.json
+            maestra-ref.txt
           if-no-files-found: ignore
