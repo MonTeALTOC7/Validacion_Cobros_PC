@@ -1,0 +1,1020 @@
+{
+  "descripcion": "Diferencias funcionales permitidas entre el bundle legacy 8b3-1-1 y v0.8 con los datos de datos/. Generada por scripts/golden-update.mjs solo a partir de diferencias que cumplen una regla de tests/golden/legacy-diff.js.",
+  "reglas": {
+    "S02_SEMANA_OPERATIVA": "La Nómina del 29–31 dic 2025 pertenece a la semana operativa 2026-S02 (columna Periodo); v0.7 la descartaba por fecha. CAMBIOS §2 #2.",
+    "ETAPA_TPS_INFORMATIVA": "Etapas de siembra sin paquete TPS: antes se omitían sin aviso; ahora son informativas. CAMBIOS §2 #4.",
+    "BANDERAS_INFORMATIVAS": "Banderas informativas nuevas de v0.8 (tarifa poco frecuente, repeticiones, lote no encontrado); no cambian el estado. CAMBIOS §2 #3, #7 y §7."
+  },
+  "resumen": {
+    "S02_SEMANA_OPERATIVA": 24,
+    "ETAPA_TPS_INFORMATIVA": 4,
+    "BANDERAS_INFORMATIVAS": 67
+  },
+  "diferencias": [
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|10|EL POLIGONO|01|VIG|30017|D-H|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|11|EL POLIGONO|05|VIG|30017|D-H|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|12|PANSACO|39|CQM|32019|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|12|PANSACO|50|VIG|30017|D-H|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|15|EL POLIGONO|07|VIG|30017|D-H|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|17|PANSACO|02|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|17|PANSACO|10|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|18|PANSACO|28|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|18|PANSACO|28|ZGC|21018|D-H|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|18|PANSACO|51|CMN|16013|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|05|CMN|16013|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|09|GCO|21076|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|09|ZGC|21018|D-H|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|10|CMN|16013|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|11|CQM|17009|D-H|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA",
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|11|CQM|32019|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|11|ZGC|21018|D-H|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|12|GCO|21076|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|12|ZGC|21018|D-H|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|20|GCO|21076|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|21|GCO|21076|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|22|GCO|21076|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|22|ZGC|21018|D-H|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|28|ZGC|21018|D-H|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|29|ZGC|21018|D-H|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|38|CMN|16013|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|38|ZGC|21018|D-H|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|41|GCO|21076|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|41|ZGC|21018|D-H|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|42|GCO|21076|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|42|ZGC|21018|D-H|",
+      "agregadas": [
+        "REPETICION_RESPALDADA",
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|43|GCO|21076|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|44|GCO|21076|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|44|ZGC|21018|D-H|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|19|PANSACO|50|VIG|30017|D-H|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|2|PANSACO|12|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|20|PANSACO|01|ZGC|21018|D-H|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|22|PANSACO|12|CQM|17009|D-H|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|22|PANSACO|12|CQM|32019|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|22|PANSACO|16|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|22|PANSACO|19|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|24|PANSACO|36|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|24|PANSACO|37|VIG|30017|D-H|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|25|PANSACO|11|CQM|17009|D-H|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|25|PANSACO|11|CQM|32019|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|27|FREDDY SOVALVARRO|06|CDR|19073|MJO|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|27|PANSACO|27|CQM|17009|D-H|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|27|PANSACO|27|CQM|32019|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|28|PANSACO|36|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|31|PANSACO|05|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|31|PANSACO|09|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|31|PANSACO|43|GCO|21076|HA|",
+      "agregadas": [
+        "DUPLICADO_POTENCIAL"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|31|PANSACO|43|ZGC|21018|D-H|",
+      "agregadas": [
+        "DUPLICADO_POTENCIAL"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|32|PANSACO|25|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|37|PANSACO|09|GCO|21076|HA|",
+      "agregadas": [
+        "REPETICION_RESPALDADA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|39|PANSACO|17|VIG|30017|D-H|",
+      "agregadas": [
+        "REPETICION_RESPALDADA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|4|CLAUDIO ALBERTO REYES RUIZ|03|CSR|19014|MJO|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|6|PANSACO|04|ZGC|21018|D-H|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|6|PANSACO|05|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|6|PANSACO|09|ZGC|21018|D-H|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|8|PANSACO|38|CSR|19014|MJO|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|9|NAPOLEON ZEPEDA GRANJA|01|GCO|21076|HA|",
+      "agregadas": [
+        "LOTE_NO_ENCONTRADO"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|9|NAPOLEON ZEPEDA GRANJA|01|ZGC|21018|D-H|",
+      "agregadas": [
+        "LOTE_NO_ENCONTRADO"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|9|PANSACO|12|CMN|16013|HA|",
+      "agregadas": [
+        "TARIFA_POCO_FRECUENTE"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|9|PANSACO|24|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|9|PANSACO|28|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "banderas",
+      "clave": "DIRECT|9|PANSACO|29|GCO|21076|HA|",
+      "agregadas": [
+        "MISMA_CANTIDAD_TARIFA_DISTINTA"
+      ],
+      "quitadas": [],
+      "regla": "BANDERAS_INFORMATIVAS"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|GUADALUPE BARRIOS|03|GCO|21076|HA|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 1.5
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 1.5,
+        "billedUnits": 1.5
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|NYDIA BETANCO PEREZ|01|CQM|17009|D-H|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 1.6
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 1.6,
+        "billedUnits": 1.6
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|01|CDR|19073|MJO|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 1200
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 1200,
+        "billedUnits": 1200
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|01|CSR|19014|MJO|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 1000
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 1000,
+        "billedUnits": 1000
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|01|ECR|19020|MJO|",
+      "antes": {
+        "status": "COBRO_EXCESO",
+        "payrollUnits": 265,
+        "billedUnits": 1524
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 1524,
+        "billedUnits": 1524
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|01|GCO|21076|HA|",
+      "antes": {
+        "status": "COBRO_EXCESO",
+        "payrollUnits": 4.8,
+        "billedUnits": 8
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 8,
+        "billedUnits": 8
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|01|ZGC|21018|D-H|",
+      "antes": {
+        "status": "COBRO_EXCESO",
+        "payrollUnits": 11.9,
+        "billedUnits": 23.2
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 23.2,
+        "billedUnits": 23.2
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|02|GCO|21076|HA|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 3.2
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 3.2,
+        "billedUnits": 3.2
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|02|ZGC|21018|D-H|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 7.8
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 7.8,
+        "billedUnits": 7.8
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|02A|ZGC|21018|D-H|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 1.3
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 1.3,
+        "billedUnits": 1.3
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|04|GCO|21076|HA|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 3.32
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 3.32,
+        "billedUnits": 3.32
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|04|ZGC|21018|D-H|",
+      "antes": {
+        "status": "COBRO_EXCESO",
+        "payrollUnits": 1.2,
+        "billedUnits": 6.6
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 6.6,
+        "billedUnits": 6.6
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|05|ZGC|21018|D-H|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 3.3
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 3.3,
+        "billedUnits": 3.3
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|06|CQM|32019|HA|",
+      "antes": {
+        "status": "COBRO_EXCESO",
+        "payrollUnits": 6.88,
+        "billedUnits": 8.88
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 8.88,
+        "billedUnits": 8.88
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|11|ZGC|21018|D-H|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 3.5
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 3.5,
+        "billedUnits": 3.5
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|12|SMR|19035|CAJAS|",
+      "antes": {
+        "status": "COBRO_EXCESO",
+        "payrollUnits": 1350,
+        "billedUnits": 4070
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 4070,
+        "billedUnits": 4070
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|12|ZGC|21018|D-H|",
+      "antes": {
+        "status": "COBRO_EXCESO",
+        "payrollUnits": 4.6,
+        "billedUnits": 8.4
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 8.4,
+        "billedUnits": 8.4
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|16|CQM|17009|D-H|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 1.5
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 1.5,
+        "billedUnits": 1.5
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|16|CQM|32019|HA|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 5.97
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 5.97,
+        "billedUnits": 5.97
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|18|CQM|17009|D-H|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 1.6
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 1.6,
+        "billedUnits": 1.6
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|18|CQM|32019|HA|",
+      "antes": {
+        "status": "COBRO_SIN_NOMINA",
+        "payrollUnits": 0,
+        "billedUnits": 9.1
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 9.1,
+        "billedUnits": 9.1
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|19|DEG|21039|D-H|",
+      "antes": {
+        "status": "COBRO_EXCESO",
+        "payrollUnits": 2.3,
+        "billedUnits": 9.1
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 9.1,
+        "billedUnits": 9.1
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|28|VIG|30017|D-H|",
+      "antes": {
+        "status": "COBRO_EXCESO",
+        "payrollUnits": 3.2,
+        "billedUnits": 8
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 8,
+        "billedUnits": 8
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "cambio",
+      "clave": "DIRECT|2|PANSACO|31|ZGC|21018|D-H|",
+      "antes": {
+        "status": "COBRO_EXCESO",
+        "payrollUnits": 6.6,
+        "billedUnits": 12.5
+      },
+      "despues": {
+        "status": "CONCILIADO",
+        "payrollUnits": 12.5,
+        "billedUnits": 12.5
+      },
+      "regla": "S02_SEMANA_OPERATIVA"
+    },
+    {
+      "tipo": "nuevo",
+      "clave": "TPS_STAGE|31|PANSACO|24A|CSS|19013|MJO|",
+      "despues": {
+        "status": "ETAPA_TPS_SIN_PAQUETE",
+        "payrollUnits": 1745,
+        "billedUnits": 0
+      },
+      "regla": "ETAPA_TPS_INFORMATIVA"
+    },
+    {
+      "tipo": "nuevo",
+      "clave": "TPS_STAGE|31|PANSACO|24A|DSE|19010|MJO|",
+      "despues": {
+        "status": "ETAPA_TPS_SIN_PAQUETE",
+        "payrollUnits": 1745,
+        "billedUnits": 0
+      },
+      "regla": "ETAPA_TPS_INFORMATIVA"
+    },
+    {
+      "tipo": "nuevo",
+      "clave": "TPS_STAGE|31|PANSACO|24A|RYA|19022|D-H|",
+      "despues": {
+        "status": "ETAPA_TPS_SIN_PAQUETE",
+        "payrollUnits": 2.4,
+        "billedUnits": 0
+      },
+      "regla": "ETAPA_TPS_INFORMATIVA"
+    },
+    {
+      "tipo": "nuevo",
+      "clave": "TPS_STAGE|36|EL GARABATO|01|DSE|32017|MJO|",
+      "despues": {
+        "status": "ETAPA_TPS_SIN_PAQUETE",
+        "payrollUnits": 250,
+        "billedUnits": 0
+      },
+      "regla": "ETAPA_TPS_INFORMATIVA"
+    }
+  ]
+}

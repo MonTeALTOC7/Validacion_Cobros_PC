@@ -1,1 +1,2 @@
 app/tests/legacy/** -text
+app/tests/golden/** -text
