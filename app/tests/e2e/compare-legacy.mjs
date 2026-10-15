@@ -1,19 +1,25 @@
 // Compara el bundle legacy 8b3-1-1 contra el build nuevo (app/dist) con los mismos Excel.
-// Uso: node tests/e2e/compare-legacy.mjs [--datos ../datos] [--out report.json] [--report-only]
+// Uso: npx vite-node tests/e2e/compare-legacy.mjs -- [--datos ../datos] [--out report.json]
+//        [--report-only | --allowlist tests/golden/legacy-allowlist.json] [--write-diffs diffs.json]
+// Con --allowlist falla si aparece una diferencia funcional no permitida o si una permitida deja de aparecer.
 import path from 'node:path';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { serve, launch, openAndWait, readDb, tabTexts } from './harness.mjs';
+import { checkAgainstAllowlist, legacyDifferences } from '../golden/legacy-diff.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.resolve(here, '../..');
+const argv = process.argv.slice(2).filter((a) => a !== '--');
 const arg = (name, def) => {
-  const i = process.argv.indexOf(name);
-  return i > 0 ? process.argv[i + 1] : def;
+  const i = argv.indexOf(name);
+  return i >= 0 ? argv[i + 1] : def;
 };
 const datos = path.resolve(appDir, arg('--datos', '../datos'));
 const outFile = arg('--out', null);
-const reportOnly = process.argv.includes('--report-only');
+const reportOnly = argv.includes('--report-only');
+const allowlistPath = arg('--allowlist', null);
+const diffsPath = arg('--write-diffs', null);
 
 const LEGACY_TABS = [
   'Resumen',
@@ -127,14 +133,36 @@ try {
     }));
   report.legacyFindings = compact(la?.findings);
   report.nextFindings = compact(na?.findings);
+  report.differences = legacyDifferences(report.legacyFindings, report.nextFindings);
   if (outFile) await writeFile(outFile, JSON.stringify(report, null, 2));
+  if (diffsPath) await writeFile(diffsPath, JSON.stringify(report.differences, null, 2));
+  if (allowlistPath) {
+    const allowlist = JSON.parse(await readFile(path.resolve(appDir, allowlistPath), 'utf8'));
+    const { unexpected, missing } = checkAgainstAllowlist(report.differences, allowlist);
+    const problems = [];
+    if (legacy.errors.length || next.errors.length)
+      problems.push(`errores de página: ${[...legacy.errors, ...next.errors].join(' | ')}`);
+    if (JSON.stringify(report.schema.legacy) !== JSON.stringify(report.schema.next))
+      problems.push('el esquema de IndexedDB cambió');
+    if (!la || !na) problems.push('no se obtuvo el análisis de alguna de las dos versiones');
+    unexpected.forEach((d) => problems.push(`diferencia NO permitida: ${JSON.stringify(d)}`));
+    missing.forEach((d) => problems.push(`diferencia permitida que ya no aparece (lista desactualizada): ${JSON.stringify(d)}`));
+    console.log(
+      `\nDiferencias funcionales legacy → v0.8: ${report.differences.length} (permitidas: ${allowlist.diferencias.length}, ` +
+        `no permitidas: ${unexpected.length}, ausentes: ${missing.length})`,
+    );
+    if (problems.length) {
+      problems.slice(0, 50).forEach((problem) => console.error('FALLA · ' + problem));
+      process.exitCode = 1;
+    } else console.log('Todas las diferencias con el legacy están permitidas y justificadas.');
+  }
   const identical =
     report.inputsEqual &&
     report.analysisEqual &&
     report.reviewEqual &&
     Object.values(report.tabs).every((x) => x === 'igual') &&
     !next.errors.length;
-  if (!identical && !reportOnly) process.exitCode = 1;
+  if (!identical && !reportOnly && !allowlistPath) process.exitCode = 1;
 } finally {
   await browser.close();
   server.close();

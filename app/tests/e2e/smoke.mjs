@@ -208,4 +208,5 @@ try {
 }
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} comprobaciones correctas`);
-if (failed.length) process.exitCode = 1;
+// 52 comprobaciones (escritorio y móvil). Menos significa que la prueba no terminó.
+if (failed.length || results.length < 52) process.exitCode = 1;

@@ -415,4 +415,11 @@ const summarize = (label, diff) => {
 summarize('Motor legacy → nuevo (mismos datos)', report.motorLegacyVsNuevo);
 summarize('Publicado hoy → nuevo (hasta la semana publicada)', report.publicadoHoyVsNuevo);
 if (outFile) await writeFile(outFile, JSON.stringify({ ...report, comprobaciones: results }, null, 2));
+// Si alguna comprobación no llegó a ejecutarse (error previo, datos ausentes) la prueba no se considera aprobada.
+const MIN_CHECKS = 21;
+if (results.length < MIN_CHECKS) {
+  console.error(`FALLA · solo se ejecutaron ${results.length} de ${MIN_CHECKS} comprobaciones`);
+  process.exitCode = 1;
+}
 if (results.some((r) => !r.ok)) process.exitCode = 1;
+console.log(`\n${results.filter((r) => r.ok).length}/${results.length} comprobaciones correctas`);

@@ -105,4 +105,10 @@ try {
   await browser.close();
   server.close();
 }
+// Con la App Maestra se esperan 10 comprobaciones; sin ella, 9. Menos significa que la prueba no terminó.
+const MIN_CHECKS = labores ? 10 : 9;
+if (results.length < MIN_CHECKS) {
+  console.error(`FALLA · solo se ejecutaron ${results.length} de ${MIN_CHECKS} comprobaciones`);
+  process.exitCode = 1;
+}
 if (results.some((ok) => !ok)) process.exitCode = 1;
