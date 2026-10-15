@@ -6,7 +6,7 @@ export const normalizeText = (value) =>
   String(value ?? '')
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
-    .replace(/�/g, '')
+    .replace(/\uFFFD/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .toUpperCase();
