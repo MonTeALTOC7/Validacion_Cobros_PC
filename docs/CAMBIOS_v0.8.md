@@ -78,9 +78,9 @@ encontrado*, *Fecha fuera de su semana* (según la columna Periodo).
 
 ## 5. Verificación
 
-- `npm test`: 54 pruebas unitarias (períodos, normalización, importadores, conciliación directa, TPS, repeticiones,
+- `npm test`: 55 pruebas unitarias (períodos, normalización, importadores, conciliación directa, TPS, repeticiones,
   cambio de año en conciliación y en Seguimiento, pendientes por cobertura, finanzas con P.FACT reutilizada y
-  universos, tarifas, calidad, Maestro Central, dataset publicado).
+  universos, tarifas, calidad, Maestro Central, dataset publicado) y 11 pruebas golden (§10).
 - `tests/e2e/smoke.mjs`: 52 comprobaciones en Chromium, escritorio (1366 px) y móvil (390 px): todas las pestañas,
   detalle con tarifa y origen, exportaciones, importación, cierre y reapertura, respaldo, esquema sin cambios.
 - `tests/e2e/upgrade.mjs`: datos guardados por v0.7 se conservan y actualizan; el cierre v0.7 se conserva; la vista de
@@ -194,3 +194,25 @@ Se evaluó separar el PR en (1) reconstrucción de la fuente, (2) cambios funcio
 ambos, de modo que tres PR se fusionarían obligatoriamente en ese orden y la raíz publicada quedaría inconsistente
 con la fuente entre fusiones; y reescribir el historial invalidaría las referencias de esta documentación. Si se
 prefiere, el primer PR puede crearse desde `123babe` sin reescribir nada.
+
+## 10. Cierre técnico (15 oct): verificaciones bloqueantes
+
+Sin cambios de reglas, importadores, montos ni interfaz.
+
+| Verificación | Qué bloquea |
+|---|---|
+| **Golden** (`app/tests/golden`, dentro de `npm test`) | Cualquier diferencia en: hallazgos por tipo, estado, bandera y semana; cobertura (2.052/2.186); pendientes (134 = 5 en semanas prefacturadas + 129 sin Prefactura); totales financieros por universo, tipo de labor y contratista (C$ 13.278.583,33); repeticiones; Seguimiento (13.930 filas) y dataset publicado; alertas de calidad; y huellas SHA-256 de cada hallazgo, línea financiera y fila de Seguimiento. También falla si cambian los archivos de `datos/`. |
+| **Registro de cifras** (`REGISTRO.md` + `scripts/golden-guard.mjs`) | Las cifras solo cambian con `npm run golden:update -- --justificacion "…"`, que agrega una fila con las huellas. La prueba exige que la última fila coincida con los archivos; la CI impide editar o borrar filas y publica el diff de cifras en el resumen de la ejecución con un aviso. |
+| **Comparación legacy** (`compare-legacy.mjs --allowlist`) | Diferencias con el bundle 8b3-1-1 fuera de la lista permitida (95: 24 transiciones S02, 4 etapas TPS informativas, 67 hallazgos con banderas informativas), o permitidas que dejan de aparecer. La lista solo admite diferencias que cumplen una regla documentada de `legacy-diff.js`. |
+| **App Maestra** (obligatoria) | Se examina en el commit fijado `MAESTRA_REF` (`938e809`) en solo lectura y sin credenciales persistidas. Falla si no puede leerse, si el commit no coincide o si no se ejecutan todas las comprobaciones (21 de compatibilidad y 10 de actualización). El resumen registra el commit y el SHA-256 de cada archivo examinado. |
+| **Pruebas de navegador** | `smoke` (52), `upgrade` (9 o 10) y `maestra-compat` (21) fallan también si no completan todas sus comprobaciones. |
+| **Acciones de GitHub** | `checkout`, `setup-node` y `upload-artifact` actualizadas a v5. |
+| **Normalización** | El carácter literal U+FFFD de `normalizeText` se reemplaza por su escape `\uFFFD`; salida idéntica (prueba unitaria). |
+
+Observación (comportamiento previo, no modificado): los identificadores de fila "por contenido" dependen de la zona
+horaria del equipo, porque se calculan sobre las fechas que SheetJS entrega en hora local. Los valores (cantidades,
+estados, montos) no cambian. Las pruebas se ejecutan en `America/Managua`, como la aplicación y las pruebas de
+navegador. Corregirlo exige tocar el importador y queda propuesto para una etapa posterior.
+
+Pendiente fuera del repositorio: marcar el check `verificar` como obligatorio en la protección de la rama `main`
+(GitHub → Settings → Branches) para que una CI en rojo impida fusionar.

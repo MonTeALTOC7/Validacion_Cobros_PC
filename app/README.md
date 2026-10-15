@@ -10,10 +10,12 @@ labores, analiza los montos facturados y conserva auditoría y cierres semanales
 cd app
 npm ci             # instalación reproducible (package-lock.json)
 npm run dev        # servidor local de desarrollo
-npm test           # pruebas unitarias del motor (Vitest)
+npm test           # pruebas unitarias y cifras de referencia golden (Vitest)
 npm run build      # build en app/dist
 npm run test:e2e   # pruebas en Chromium sobre app/dist (CHROME_PATH, /opt/pw-browsers o `npx playwright-core install chromium`)
 npm run compare    # informe de diferencias contra el bundle legacy 8b3-1-1 (tests/legacy)
+npm run compare:check   # falla ante diferencias con el legacy fuera de tests/golden/legacy-allowlist.json
+npm run golden:update -- --justificacion "…"   # regenera las cifras de referencia (ver tests/golden/README.md)
 npm run engine -- <nomina.xlsx> <prefactura.xlsx> <maestro.xlsx>   # resumen del motor sobre Excel reales
 npm run release    # build + copia a la raíz del repositorio (publicar = fusionar a main con autorización)
 npm run verify:release   # la raíz coincide con app/dist y conserva datos/ y archivos estáticos
@@ -21,11 +23,11 @@ npm run verify:legacy    # tests/legacy idéntico a e7587c3 (SHA256SUMS + histor
 npx vite-node tests/e2e/maestra-compat.mjs -- --labores <App Maestra>/modules/labores   # regresión App Maestra
 ```
 
-La CI (`.github/workflows/ci.yml`) ejecuta en cada pull request: `npm ci`, formato, pruebas unitarias, copia legacy,
-`npm run release` + `verify:release` + raíz sin cambios respecto de lo versionado (el build es determinista), humo en
-Chromium sobre `app/dist` y sobre la raíz, actualización desde v0.7, comparación legacy (informe) y, si el repositorio
-de la App Maestra es legible con el token de la CI, la regresión de compatibilidad. No publica ni escribe en otros
-repositorios.
+La CI (`.github/workflows/ci.yml`) ejecuta en cada pull request: `npm ci`, formato, pruebas unitarias y golden,
+registro de cifras de referencia, copia legacy, `npm run release` + `verify:release` + raíz sin cambios respecto de lo
+versionado (el build es determinista), humo en Chromium sobre `app/dist` y sobre la raíz, actualización desde v0.7,
+comparación legacy contra la lista de diferencias permitidas y la regresión obligatoria con la App Maestra en un commit
+fijado. Todo es bloqueante. No publica ni escribe en otros repositorios.
 
 ## Estructura
 
@@ -38,8 +40,9 @@ repositorios.
 | `src/components/` | Interfaz por módulo (Resumen, Conciliación, Revisión, Seguimiento, Financiero, TPS, Auditoría, Carga, Parámetros). |
 | `tests/unit/` | Casos controlados con Excel sintéticos. |
 | `tests/e2e/` | Prueba de humo, ruta de actualización, comparación contra el legacy y compatibilidad con la App Maestra (`maestra-compat.mjs`). |
+| `tests/golden/` | Cifras de referencia, diferencias legacy permitidas y registro justificado. |
 | `tests/legacy/` | Copia exacta del bundle publicado 8b3-1-1 (solo para comparar), con `SHA256SUMS`. |
-| `scripts/` | `release` (copia a la raíz), `verify-release`, `verify-legacy`. |
+| `scripts/` | `release` (copia a la raíz), `verify-release`, `verify-legacy`, `golden-update`, `golden-guard`. |
 | `tools/` | Reconstrucción de la fuente y utilidades de renombrado (trazabilidad). |
 
 ## Restricciones que deben respetarse

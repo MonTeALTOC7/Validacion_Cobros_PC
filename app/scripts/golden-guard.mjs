@@ -12,7 +12,12 @@ const FILES = [`${GOLDEN}/expected.json`, `${GOLDEN}/legacy-allowlist.json`];
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 const show = (ref, file) => {
   try {
-    return git('show', `${ref}:${file}`);
+    // El archivo puede no existir en la base (creación): es un caso esperado, sin mensaje de error.
+    return execFileSync('git', ['show', `${ref}:${file}`], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      maxBuffer: 64 * 1024 * 1024,
+    });
   } catch {
     return null;
   }
