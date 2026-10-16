@@ -53,6 +53,13 @@ async function capture(browser, url) {
   const { context, page, errors } = await openAndWait(browser, url);
   const db = await readDb(page);
   const texts = await tabTexts(page, LEGACY_TABS);
+  // El panel histórico conserva sus reglas; en V1 vive dentro del envoltorio tarifario nuevo.
+  if (texts['Auditoría y cierres'] === null) {
+    await page.locator('.sidebar nav button', { hasText: 'Auditoría de tarifas y cobros' }).click();
+    await page.getByRole('button', { name: 'Historial y cierres', exact: true }).click();
+    await page.locator('.week-controls').waitFor();
+    texts['Auditoría y cierres'] = await page.locator('main').innerText();
+  }
   await context.close();
   return { db, texts, errors };
 }

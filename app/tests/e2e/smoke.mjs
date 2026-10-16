@@ -24,7 +24,7 @@ const TABS = [
   'Seguimiento de labores',
   'Financiero',
   'Paquetes TPS',
-  'Auditoría y cierres',
+  'Auditoría de tarifas y cobros',
   'Actualizar archivos',
   'Parámetros',
 ];
@@ -158,7 +158,9 @@ try {
       await page.locator('button', { hasText: 'Cancelar · conservar actual' }).click();
 
       // Cierre y reapertura de una semana sin pendientes
-      await clickNav('Auditoría y cierres');
+      await clickNav('Auditoría de tarifas y cobros');
+      await page.getByRole('button', { name: 'Historial y cierres', exact: true }).click();
+      await page.locator('.week-controls').waitFor();
       const available = page.locator('.week-controls button', { hasText: 'Disponible para cerrar' }).first();
       if (await available.count()) {
         await available.click();
