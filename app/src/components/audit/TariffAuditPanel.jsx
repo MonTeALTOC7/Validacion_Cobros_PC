@@ -285,9 +285,7 @@ export function TariffAuditPanel(props) {
                           </small>
                         </div>
                       </div>
-                      <p className="audit-mobile-hint">
-                        Toca un mes para consultar muestras, MAD y referencia completa.
-                      </p>
+                      <p className="audit-mobile-hint">Toca un mes para consultar muestras, MAD y referencia completa.</p>
                       <DataTable
                         key={series.key}
                         rows={periods}
