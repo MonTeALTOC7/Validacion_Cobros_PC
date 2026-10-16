@@ -6,7 +6,7 @@
 # - Cifras de referencia (golden) bloqueantes: resultados del motor sobre datos/ y registro justificado de cambios.
 # - Fechas e identificadores independientes de la zona horaria: pruebas unitarias también en Asia/Tokyo y en el
 #   navegador en varias zonas, con la transición desde el build v0.8 previo (tests/v08).
-# - Pruebas de navegador: humo (build y raíz), actualización desde v0.7 y comparación con el legacy contra la lista de
+# - Pruebas de navegador: humo (build y raíz), detalle navegable, actualización desde v0.7 y comparación con el legacy contra la lista de
 #   diferencias permitidas (bloqueante).
 # - Compatibilidad obligatoria con la vista de labores de la App Maestra, examinada en un commit fijo (solo lectura).
 name: CI
@@ -100,6 +100,9 @@ jobs:
 
       - name: Humo (raíz publicada)
         run: node tests/e2e/smoke.mjs --site ..
+
+      - name: Detalle navegable (drill-down) en escritorio y móvil
+        run: node tests/e2e/drilldown.mjs --site ..
 
       - name: Actualización desde v0.7 en el mismo origen
         run: node tests/e2e/upgrade.mjs

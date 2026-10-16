@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { FileGrid } from './FileGrid';
 import { isRemoteMasterFile } from '../data/remoteMaster';
+import { QualityDrill } from './drill/QualityDrill';
+import { hasAllRecords } from '../engine/quality';
 
 export function CheckItem({ label, value, ok }) {
   return (
@@ -34,6 +36,7 @@ export function LoadPanel({
   ready,
   startDate,
   quality = [],
+  atypicalTariffPct = 5,
   masterSource,
   remoteMaster,
   published,
@@ -47,6 +50,8 @@ export function LoadPanel({
 }) {
   const restoreInput = useRef(null);
   const [restoring, setRestoring] = useState(false);
+  // Alerta de calidad abierta en el detalle (todos sus registros o sus grupos de repetición).
+  const [qualityIssue, setQualityIssue] = useState(null);
   const masterFile = inputs.files.find((file) => file.kind === 'master');
   const usingRemote = isRemoteMasterFile(masterFile);
 
@@ -142,6 +147,17 @@ export function LoadPanel({
                   <b>{item.count.toLocaleString('es-NI')}</b>
                 </summary>
                 <p>{item.detail}</p>
+                {(item.id.startsWith('repetition-') || item.examples.length > 0) && (
+                  <p className="quality-actions">
+                    <button type="button" className="button secondary" onClick={() => setQualityIssue(item)}>
+                      {item.id.startsWith('repetition-')
+                        ? 'Ver grupos y evidencia'
+                        : hasAllRecords(item)
+                          ? `Ver todos los registros (${item.count.toLocaleString('es-NI')})`
+                          : `Ver ejemplos conservados (${item.examples.length} de ${item.count.toLocaleString('es-NI')})`}
+                    </button>
+                  </p>
+                )}
                 {item.examples.length > 0 && (
                   <div className="table-wrap compact-table">
                     <table>
@@ -284,6 +300,14 @@ export function LoadPanel({
             ))}
           </div>
         </section>
+      )}
+      {qualityIssue && (
+        <QualityDrill
+          issue={qualityIssue}
+          inputs={inputs}
+          atypicalTariffPct={atypicalTariffPct}
+          onClose={() => setQualityIssue(null)}
+        />
       )}
     </>
   );
