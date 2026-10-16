@@ -33,6 +33,8 @@ try {
       if (device === 'móvil') await page.getByRole('button', { name: 'Abrir menú', exact: true }).click();
       await page.locator('.sidebar nav button').nth(6).click();
       await page.locator('.audit-scope').waitFor();
+      if (device === 'móvil')
+        await page.waitForFunction(() => document.querySelector('.sidebar').getBoundingClientRect().right <= 0);
     };
     await nav();
     check(

@@ -33,13 +33,13 @@ const VIEWS = {
   history: 'Historial y cierres',
 };
 
-function LineTable({ rows, onOpen, tableKey = 'lines' }) {
+function LineTable({ rows, onOpen, tableKey = 'lines', compact = false }) {
   return (
     <DataTable
       key={tableKey}
       rows={rows}
       rowKey={(row) => row.auditId}
-      pageSize={20}
+      pageSize={compact ? 6 : 20}
       onRowClick={onOpen}
       columns={[
         { key: 'sourceRow', label: 'Fila', num: true },
@@ -79,7 +79,7 @@ function LineTable({ rows, onOpen, tableKey = 'lines' }) {
             </span>
           ),
         },
-      ]}
+      ].filter((column) => !compact || ['sourceRow', 'service', 'tariff', 'effective', 'pFact'].includes(column.key))}
     />
   );
 }
@@ -187,7 +187,19 @@ export function TariffAuditPanel(props) {
                       title="Prioridad de revisión"
                       subtitle="Extremos relativos a su propia población. Abra una línea para consultar la evidencia."
                     >
-                      <LineTable rows={filterAuditRows(audit.rows, { category: 'EXTREME' })} onOpen={openLine} />
+                      <LineTable
+                        compact
+                        rows={filterAuditRows(audit.rows, { category: 'EXTREME' }).sort((a, b) => {
+                          const distance = (row) =>
+                            Math.max(
+                              ...row.observations
+                                .filter((item) => item.ratio > 0)
+                                .map((item) => Math.max(item.ratio, 1 / item.ratio)),
+                            );
+                          return distance(b) - distance(a);
+                        })}
+                        onOpen={openLine}
+                      />
                       <button className="button secondary" onClick={() => showCategory('observed')}>
                         Ver todos los indicadores ({audit.summary.observed})
                       </button>
