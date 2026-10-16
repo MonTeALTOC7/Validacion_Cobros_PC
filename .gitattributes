@@ -1,2 +1,3 @@
 app/tests/legacy/** -text
 app/tests/golden/** -text
+app/tests/v08/** -text

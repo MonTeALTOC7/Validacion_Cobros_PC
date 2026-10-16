@@ -3,10 +3,6 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { readFileSync } from 'node:fs';
 
-// Las pruebas (incluidas las cifras de referencia) se ejecutan en la zona horaria operativa de CASUR, como la app y
-// las pruebas de navegador: los identificadores de fila se derivan de fechas leídas en hora local.
-if (process.env.VITEST) process.env.TZ = 'America/Managua';
-
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
 // La app se publica en GitHub Pages bajo /Validacion_Cobros_PC/ con rutas relativas.

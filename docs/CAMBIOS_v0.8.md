@@ -209,10 +209,63 @@ Sin cambios de reglas, importadores, montos ni interfaz.
 | **Acciones de GitHub** | `checkout` y `setup-node` v5, `upload-artifact` v6, todas sobre Node 24 (sin avisos de versión obsoleta). |
 | **Normalización** | El carácter literal U+FFFD de `normalizeText` se reemplaza por su escape `\uFFFD`; salida idéntica (prueba unitaria). |
 
-Observación (comportamiento previo, no modificado): los identificadores de fila "por contenido" dependen de la zona
-horaria del equipo, porque se calculan sobre las fechas que SheetJS entrega en hora local. Los valores (cantidades,
-estados, montos) no cambian. Las pruebas se ejecutan en `America/Managua`, como la aplicación y las pruebas de
-navegador. Corregirlo exige tocar el importador y queda propuesto para una etapa posterior.
+Observación (comportamiento previo): los identificadores de fila "por contenido" dependían de la zona horaria del
+equipo. La investigación posterior mostró que el problema era mayor: al este de UTC también cambiaban las fechas. Se
+corrige en la sección 11.
 
 Pendiente fuera del repositorio: marcar el check `verificar` como obligatorio en la protección de la rama `main`
 (GitHub → Settings → Branches) para que una CI en rojo impida fusionar.
+
+## 11. Fechas e identificadores independientes de la zona horaria (16 oct)
+
+**Hallazgo.** SheetJS 0.18.5 (`cellDates`) crea las fechas de Excel a medianoche de la zona horaria del equipo, y el
+importador tomaba de ellas la fecha UTC y la firma de la fila (`stableIdFactory`). Reproducción controlada con los
+mismos Excel de `datos/`, comparando contra Managua:
+
+| Zona del equipo | Fecha normalizada | Año / semana operativa | Id de fila (17.472) | Hallazgos | Cifras y montos |
+|---|---|---|---|---|---|
+| America/Managua (UTC−6) | referencia | referencia | referencia | 2.348 | referencia |
+| UTC, America/New_York, Pacific/Pago_Pago | igual | igual | **todos distintos** | 2.348; 160 con otro id (TPS y excepciones), mismos vínculos por fila de origen | iguales (cambian las huellas) |
+| Europe/Madrid, Asia/Tokyo, Pacific/Kiritimati | **un día antes en todas las filas** (Nómina, Prefactura; Maestro en Tokio y Kiritimati) | igual (la semana viene de la columna Semana) | **todos distintos** | 2.348, mismos estados y montos; **813 con bandera FECHA_FUERA_DE_SEMANA** | totales iguales; Calidad: 2.113 «fecha fuera de semana» y 152 (en vez de 3) «fuera de la semana inferida» |
+
+La revisión por correo no tiene celdas de fecha y no cambiaba. No había referencias persistentes rotas: los cierres usan
+la huella de archivos y parámetros, y hallazgos, revisión y Seguimiento se recalculan desde las filas guardadas.
+
+**Corrección** (`readExcelWorkbook` en `importers.js`, conversiones en `normalize.js`):
+
+- `.xlsx` y `.xls` se leen con los seriales de Excel, que no dependen de la zona horaria (`cellDates: false`,
+  `cellNF: true`), y se convierten las celdas con formato de fecha según el mismo criterio que usaba SheetJS
+  (`SSF.is_date`). Los formatos de texto (HTML, XML, CSV) conservan la lectura de SheetJS y se toma su hora de pared.
+- Cada celda de fecha se representa con **el mismo instante que SheetJS producía en un equipo con America/Managua**,
+  incluidos los 12 s de la hora media local de 1899 en `.xlsx`. Por eso la firma y el identificador de cada fila
+  importada en Nicaragua con v0.7/v0.8 no cambian. La fecha calendario sale del serial (`excelDay`) y no depende de
+  la hora: 23:59:59 sigue en el mismo día. Antes, en Managua, una hora desde las 18:00 pasaba al día siguiente; no hay
+  casos en `datos/`.
+- Sin cambios de reglas, cantidades, montos, exportadores ni esquema de IndexedDB. Las cifras de referencia
+  (`expected.json`) **no cambian**, porque ya estaban calculadas en Managua, y el registro no tiene filas nuevas.
+
+**Verificación.**
+
+| Prueba | Resultado |
+|---|---|
+| Reproducción en 7 zonas (Managua, UTC, Nueva York, Madrid, Tokio, Kiritimati, Pago Pago) contra Managua antes de la corrección | 0 diferencias en fecha, año, semana e id de las 17.472 filas, fechas del Maestro, revisión, 2.348 hallazgos con vínculos, dataset publicado y cifras de referencia completas. |
+| Fechas diarias 1900–2100 con horas (incluidas 23:59:59) en `.xlsx` y `.xls`, en 9 zonas (incluidas Santiago, Apia, Lord Howe, Kiritimati) | Fecha exacta en el 100 % de las celdas y firma idéntica en todas las zonas. Frente a v0.8 en Managua, la firma solo difiere en fechas de períodos en que Nicaragua no estaba en UTC−6 (antes de 1934, 1973–75, 1979–80, 1992–96, 2005–06); los reportes de movimientos no tienen esas fechas. |
+| Prefactura real convertida a `.xls` | Firma idéntica a v0.8 en Managua en todas las zonas. |
+| `tests/unit/timezone.test.js` | Ejecuta las cifras de referencia completas en procesos con 6 zonas y exige que sean exactamente `expected.json`. Con la lectura anterior falla en las 5 zonas distintas de Managua. |
+| `tests/e2e/timezone.mjs` (Chromium, 29 comprobaciones) | Importación en el navegador en 6 zonas, idéntica a Managua y a la huella de referencia. Transición desde el build v0.8 previo (`tests/v08`, copia exacta de `3ca0876`) en el mismo origen: en Managua los datos guardados son idénticos a los nuevos; en Tokio se reproduce el error, la versión nueva conserva los datos sin modificarlos en silencio y la reimportación de los mismos archivos muestra las filas que cambian y deja todo idéntico a Managua. |
+
+**Datos guardados previamente** (no requiere migración):
+
+- Equipos en Managua: ids y fechas idénticos; nada cambia.
+- Equipos en UTC o al oeste: las fechas guardadas eran correctas. Los ids guardados difieren de los nuevos, pero nada
+  persistente los referencia; la próxima importación los sustituye.
+- Equipos al este de UTC (improbable en CASUR): las fechas guardadas están un día antes. La aplicación no las modifica
+  sola, porque no puede saber con certeza en qué zona se importaron (un respaldo puede venir de otro equipo). Para
+  corregirlas hay que volver a importar los mismos archivos: la comprobación previa muestra las filas modificadas. El
+  Maestro Central se renueva solo al abrir la aplicación.
+
+**Limitación residual:** en archivos HTML, XML o CSV con fechas en texto, SheetJS sigue interpretando la hora en la
+zona del equipo. Una hora que no existe localmente por un cambio de hora puede desplazarse una hora. Los reportes
+SIAGRI son `.xlsx`. En CI ya no se fija la zona horaria de las pruebas: el conjunto completo se ejecuta también en
+`Asia/Tokyo`.
+
