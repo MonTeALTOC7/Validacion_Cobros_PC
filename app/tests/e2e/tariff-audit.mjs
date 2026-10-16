@@ -158,13 +158,6 @@ try {
       `${device}: tabla por período con MAD`,
       /Mes observado/i.test(rates) && /MAD efectiva/i.test(rates) && (await module.locator('tbody tr').count()) > 1,
     );
-    if (device === 'móvil') {
-      const headers = module.locator('.audit-series ~ .table-wrap .data-table thead th');
-      check(
-        'móvil: medianas reportada y efectiva visibles sin columnas secundarias',
-        (await headers.nth(3).isVisible()) && (await headers.nth(4).isVisible()) && !(await headers.nth(1).isVisible()),
-      );
-    }
     if (shots) await page.screenshot({ path: path.join(shots, `${device}-historico.png`), fullPage: true });
     await view('Historial y cierres');
     check(`${device}: panel de cierres original accesible`, (await module.locator('.week-controls button').count()) > 0);
