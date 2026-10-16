@@ -17,7 +17,7 @@ import {
 } from '../../src/lib/drill';
 import { buildFinanceRows, financeSummary } from '../../src/engine/finance';
 import { classifyRepetitions } from '../../src/engine/repetitions';
-import { assessDataQuality } from '../../src/engine/quality';
+import { assessDataQuality, hasAllRecords } from '../../src/engine/quality';
 import { DEFAULT_PARAMETERS } from '../../src/engine/constants';
 import { loadPublishedInputs } from '../golden/snapshot';
 
@@ -176,6 +176,23 @@ describe('drill: repeticiones y evidencia de Nómina', () => {
     expect(
       repetitionEvidence({ kind: 'DUPLICADO_EXACTO', rows: [mechanized] }, [mechanized], payrollIndex([])).payrollApplies,
     ).toBe(false);
+  });
+});
+
+describe('drill: alertas de Calidad con registros completos o solo ejemplos', () => {
+  it('las filas descartadas al importar solo tienen sus ejemplos (hasta 20); las demás alertas, todos sus registros', () => {
+    const file = (skippedRows, examples) => ({
+      kind: 'payroll',
+      name: 'Nomina.xlsx',
+      skippedRows,
+      skipReasons: { date: skippedRows },
+      skippedExamples: Array.from({ length: examples }, (_, i) => ({ row: i + 2, reason: 'date' })),
+    });
+    const quality = (skipped) =>
+      assessDataQuality({ payroll: [], prefactura: [], master: [], files: [skipped] }).find((i) => i.id === 'skipped-payroll');
+    expect(hasAllRecords(quality(file(25, 20)))).toBe(false);
+    expect(hasAllRecords(quality(file(3, 3)))).toBe(true);
+    expect(hasAllRecords({ id: 'tariff-atypical', count: 40, examples: [] })).toBe(true);
   });
 });
 

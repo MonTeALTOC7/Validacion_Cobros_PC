@@ -4,7 +4,7 @@ import { DataTable } from '../common/DataTable';
 import { DrillDrawer } from './DrillDrawer';
 import { LineFields } from './LineFields';
 import { RepetitionGroupDetail, RepetitionGroupsList } from './RepetitionGroups';
-import { assessDataQuality } from '../../engine/quality';
+import { assessDataQuality, hasAllRecords } from '../../engine/quality';
 import { REPETITION_KINDS, classifyRepetitions } from '../../engine/repetitions';
 import { normalizeText } from '../../engine/normalize';
 import { payrollIndex, repetitionEvidence } from '../../lib/drill';
@@ -30,7 +30,7 @@ const rootLevel = (issue, inputs, atypicalTariffPct) => {
     detail: issue.detail,
     count: issue.count,
     items: full?.items ?? full?.examples ?? issue.examples,
-    complete: !!full?.items,
+    complete: !!full?.items || hasAllRecords(issue),
     search: '',
   };
 };
@@ -109,8 +109,8 @@ function ItemsLevel({ level, onSearch, onOpen }) {
       <p className="explanation">{level.detail}</p>
       <p className="drill-note">
         {level.complete
-          ? `${level.items.length.toLocaleString('es-NI')} registro(s) afectados${level.count !== level.items.length ? ` (la alerta cuenta ${level.count})` : ''}. Seleccione uno para ver su origen.`
-          : `El importador conserva hasta ${level.items.length} ejemplo(s) de esta alerta; la alerta cuenta ${level.count}.`}
+          ? `${level.items.length.toLocaleString('es-NI')} registro(s) afectados${level.count !== level.items.length ? ` (la alerta cuenta ${level.count})` : ''}. ${level.items.some((item) => item.rowId) ? 'Seleccione uno para ver su origen.' : 'Las filas descartadas al importar no se guardan: se indica su archivo y fila.'}`
+          : `Solo hay ${level.items.length} ejemplo(s) de los ${level.count.toLocaleString('es-NI')} registros de esta alerta: las filas descartadas al importar no se guardan y el importador conserva hasta 20 ejemplos por archivo. Para verlos todos, revise el archivo de origen.`}
       </p>
       <label className="drill-search">
         <Search size={15} />

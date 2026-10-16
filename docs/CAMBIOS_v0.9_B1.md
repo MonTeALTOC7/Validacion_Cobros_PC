@@ -65,10 +65,10 @@ financieros, cierres, IndexedDB ni exportadores: las cifras de referencia (golde
 - **Totales:** el panel recibe exactamente las filas con las que se calcula cada KPI o grupo, de modo que la suma de
   los grupos de cada pestaña coincide con el total del nivel. Con los datos publicados, todas las dimensiones suman
   C$ 13.278.583,33 (prueba unitaria).
-- **Pruebas unitarias** (`tests/unit/drill.test.js`, 10): agrupación y totales por dimensión, unidades sin mezclar,
+- **Pruebas unitarias** (`tests/unit/drill.test.js`, 11): agrupación y totales por dimensión, unidades sin mezclar,
   filtro equivalente verificado (incluido un nombre compartido por dos códigos de productor), líneas de repetición
   sin doble conteo, evidencia de Nómina por clave y Calidad completa con salida por defecto idéntica.
-- **E2E** (`tests/e2e/drilldown.mjs`, 48 comprobaciones, escritorio 1366 px y móvil 390 px, en la CI):
+- **E2E** (`tests/e2e/drilldown.mjs`, 54 comprobaciones, escritorio 1366 px y móvil 390 px, en la CI):
   - KPI = total del panel;
   - suma de grupos = total en cada nivel;
   - tres niveles con ruta, Volver, salto por ruta y Cerrar con filtros conservados;
@@ -79,3 +79,24 @@ financieros, cierres, IndexedDB ni exportadores: las cifras de referencia (golde
   - IndexedDB sin cambios y sin errores de página.
 - **Sin regresiones:** golden, comparación legacy, humo (52), actualización y compatibilidad con la App Maestra siguen
   en verde.
+
+## Revisión puntual (16 oct), sin funciones nuevas
+
+- **Integración de v0.8:** incluye la corrección de fechas e identificadores independientes de la zona horaria del
+  PR #1 (merge `64a0fed`); ver la sección 11 de `CAMBIOS_v0.8.md`.
+- **Teclado:** el panel de detalle es un diálogo modal. Tab y Mayús+Tab recorren solo sus controles, y si el foco
+  intenta salir vuelve al panel. Escape cierra y el foco regresa al control que lo abrió. Las filas se abren con Enter.
+  E2E: 40 pulsaciones de Tab y 40 de Mayús+Tab sin salir del panel, en escritorio y móvil; sin la corrección, la
+  prueba falla.
+- **Calidad:** las filas descartadas al importar no se guardan; el importador conserva hasta 20 ejemplos por
+  archivo. Esas alertas ya no ofrecen «Ver todos los registros». Muestran «Ver ejemplos conservados (20 de N)» y el
+  detalle lo aclara. Las demás alertas sí traen todos sus registros. E2E con una Nómina de 25 filas sin fecha.
+- **Repeticiones:** el detalle de un grupo separa tres partes:
+  1. «Registros repetidos en Prefactura»: el criterio del grupo y sus líneas.
+  2. «Evidencia disponible»: la Nómina de la misma clave y todas las líneas de Prefactura de la clave.
+  3. «Interpretación»: la aplicación no califica el grupo ni concluye si hay un cobro indebido. La interpretación
+     corresponde a la auditoría operativa, que se trabaja por separado.
+- Fuera del alcance de B1, sin cambios: los demás paneles de v0.8 (detalle de hallazgo, revisión, Seguimiento,
+  importación) no tienen la misma trampa de foco y quedan para B2. La franja «Posibles duplicados incluidos en el
+  total…» de Financiero es de v0.8 y no se modificó.
+

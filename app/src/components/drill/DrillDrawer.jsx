@@ -1,6 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { ArrowLeft, ChevronRight, X } from 'lucide-react';
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+const focusableIn = (root) => [...root.querySelectorAll(FOCUSABLE)].filter((element) => element.getClientRects().length > 0);
+
 /**
  * Panel lateral de detalle con niveles: ruta de navegación, Volver y Cerrar.
  * La página de origen queda montada debajo, de modo que sus filtros y selecciones no cambian.
@@ -13,15 +17,34 @@ export function DrillDrawer({ eyebrow, stack, onBack, onJump, onClose, children 
   close.current = onClose;
   const current = stack.at(-1);
 
-  // Escape cierra; al cerrar, el foco vuelve al control que abrió el detalle.
+  // Diálogo modal: Escape cierra; Tab y Mayús+Tab recorren solo el panel y el foco no pasa a la página de debajo.
+  // Al cerrar, el foco vuelve al control que abrió el detalle.
   useEffect(() => {
     const previous = opener.current;
     const onKey = (event) => {
-      if (event.key === 'Escape') close.current();
+      if (event.key === 'Escape') return close.current();
+      if (event.key !== 'Tab' || !panel.current) return;
+      const items = focusableIn(panel.current);
+      const inside = panel.current.contains(document.activeElement);
+      if (!items.length) {
+        event.preventDefault();
+        panel.current.focus();
+      } else if (event.shiftKey && (!inside || document.activeElement === items[0] || document.activeElement === panel.current)) {
+        event.preventDefault();
+        items.at(-1).focus();
+      } else if (!event.shiftKey && (!inside || document.activeElement === items.at(-1))) {
+        event.preventDefault();
+        items[0].focus();
+      }
+    };
+    const onFocusIn = (event) => {
+      if (panel.current && !panel.current.contains(event.target)) panel.current.focus();
     };
     document.addEventListener('keydown', onKey);
+    document.addEventListener('focusin', onFocusIn);
     return () => {
       document.removeEventListener('keydown', onKey);
+      document.removeEventListener('focusin', onFocusIn);
       if (previous && typeof previous.focus === 'function') previous.focus();
     };
   }, []);

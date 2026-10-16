@@ -3,7 +3,8 @@
 // la conservación de filtros, "Aplicar como filtro" reversible, la ficha de línea con origen y la Calidad completa.
 // Uso: node tests/e2e/drilldown.mjs [--site dist|..] [--shots carpeta]
 import path from 'node:path';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
+import { read, utils, write } from 'xlsx';
 import { fileURLToPath } from 'node:url';
 import { serve, launch, openAndWait, readDb } from './harness.mjs';
 
@@ -89,6 +90,16 @@ try {
       );
     }
     if (shots) await page.screenshot({ path: path.join(shots, `${label}-1-total.png`) });
+    // Diálogo modal: Tab y Mayús+Tab no salen del panel
+    const focusStaysInside = async (key) => {
+      for (let i = 0; i < 40; i += 1) {
+        await page.keyboard.press(key);
+        if (!(await page.evaluate(() => !!document.activeElement?.closest('.drill-drawer')))) return false;
+      }
+      return true;
+    };
+    check(`${label} · Tab recorre solo el panel abierto`, await focusStaysInside('Tab'));
+    check(`${label} · Mayús+Tab recorre solo el panel abierto`, await focusStaysInside('Shift+Tab'));
 
     // Nivel 1 → por productor: la suma de los grupos coincide con el total del nivel
     await tab('Por productor');
@@ -189,8 +200,12 @@ try {
     await page.waitForTimeout(300);
     const groupText = await drawer.innerText();
     check(
-      `${label} · grupo: líneas y evidencia de Nómina sin calificar el caso`,
-      /Líneas del grupo/.test(groupText) && /Nómina/.test(groupText) && !/doble cobro/i.test(groupText),
+      `${label} · grupo: registros, evidencia e interpretación separados, sin calificar el caso`,
+      /1 · Registros repetidos en Prefactura/.test(groupText) &&
+        /2 · Evidencia disponible: Nómina/.test(groupText) &&
+        /3 · Interpretación/.test(groupText) &&
+        /no califica este grupo/.test(groupText) &&
+        !/doble cobro/i.test(groupText),
     );
     await drawer.locator('button[aria-label="Cerrar detalle"]').click();
 
@@ -212,6 +227,45 @@ try {
     if (shots) await page.screenshot({ path: path.join(shots, `${label}-3-calidad.png`) });
     await drawer.locator('button[aria-label="Cerrar detalle"]').click();
 
+    // Alerta con filas descartadas al importar: solo se conservan 20 ejemplos y no se promete «Ver todos»
+    if (label === 'escritorio') {
+      const book = read(await readFile(path.join(datos, 'Nomina_2026.xlsx')));
+      const sheet = book.Sheets.REPORTE;
+      const range = utils.decode_range(sheet['!ref']);
+      const fecha = [...Array(range.e.c + 1).keys()].find((c) => sheet[utils.encode_cell({ r: 0, c })]?.v === 'Fecha');
+      for (let r = 1; r <= 25; r += 1) delete sheet[utils.encode_cell({ r, c: fecha })];
+      await page
+        .locator('.file-card', { hasText: 'Nómina' })
+        .first()
+        .locator('input[type=file]')
+        .setInputFiles({
+          name: 'Nomina_25_sin_fecha.xlsx',
+          mimeType: 'application/octet-stream',
+          buffer: Buffer.from(write(book, { type: 'buffer', bookType: 'xlsx' })),
+        });
+      const review = page.locator('.drawer', { hasText: 'Comprobación antes de reemplazar' });
+      await review.waitFor({ timeout: 60000 });
+      await review.locator('input[type=checkbox]').check();
+      await review.locator('button', { hasText: 'Confirmar actualización' }).click();
+      await review.waitFor({ state: 'detached', timeout: 60000 });
+      const skipped = page.locator('.quality-item', { hasText: 'Nómina: 25 fila(s) no utilizables' });
+      await skipped.locator('summary').click();
+      const button = skipped.locator('.quality-actions button');
+      check(
+        `${label} · Calidad: filas descartadas sin prometer «Ver todos»`,
+        (await button.innerText()).trim() === 'Ver ejemplos conservados (20 de 25)',
+        await button.innerText(),
+      );
+      await button.click();
+      await drawer.waitFor();
+      check(
+        `${label} · Calidad: el detalle aclara que solo hay ejemplos`,
+        /Solo hay 20 ejemplo\(s\) de los 25 registros/.test(await drawer.innerText()) &&
+          (await drawer.locator('tbody tr').count()) === 20,
+      );
+      await drawer.locator('button[aria-label="Cerrar detalle"]').click();
+    }
+
     const db = await readDb(page);
     check(`${label} · IndexedDB sin cambios de esquema`, db.version === 10 && db.stores.join(',') === 'audit,closures,values');
     check(`${label} · sin errores de página`, !errors.length, errors.slice(0, 3).join(' | '));
@@ -223,5 +277,5 @@ try {
 }
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} comprobaciones correctas`);
-// 23 comprobaciones en escritorio y 25 en móvil. Menos significa que la prueba no terminó.
-if (failed.length || results.length < 48) process.exitCode = 1;
+// 27 comprobaciones en escritorio y 27 en móvil. Menos significa que la prueba no terminó.
+if (failed.length || results.length < 54) process.exitCode = 1;

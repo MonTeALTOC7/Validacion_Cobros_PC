@@ -15,6 +15,7 @@ import {
 import { FileGrid } from './FileGrid';
 import { isRemoteMasterFile } from '../data/remoteMaster';
 import { QualityDrill } from './drill/QualityDrill';
+import { hasAllRecords } from '../engine/quality';
 
 export function CheckItem({ label, value, ok }) {
   return (
@@ -151,7 +152,9 @@ export function LoadPanel({
                     <button type="button" className="button secondary" onClick={() => setQualityIssue(item)}>
                       {item.id.startsWith('repetition-')
                         ? 'Ver grupos y evidencia'
-                        : `Ver todos los registros (${item.count.toLocaleString('es-NI')})`}
+                        : hasAllRecords(item)
+                          ? `Ver todos los registros (${item.count.toLocaleString('es-NI')})`
+                          : `Ver ejemplos conservados (${item.examples.length} de ${item.count.toLocaleString('es-NI')})`}
                     </button>
                   </p>
                 )}

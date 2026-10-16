@@ -41,6 +41,12 @@ const issue = (id, severity, title, detail, items, full = false) => ({
 });
 
 /**
+ * Si la alerta tiene disponibles todos sus registros. Las filas descartadas al importar no se guardan: de ellas solo
+ * quedan los ejemplos que conserva el importador (hasta 20 por archivo).
+ */
+export const hasAllRecords = (issue) => !issue.id.startsWith('skipped-') || issue.examples.length >= issue.count;
+
+/**
  * @param inputs datos cargados (payroll, prefactura, master, files)
  * @param options { atypicalTariffPct, fullItems }: con fullItems, cada problema incluye todos sus registros (items).
  * @returns lista de problemas { id, severity, title, detail, count, examples[], items[]? }

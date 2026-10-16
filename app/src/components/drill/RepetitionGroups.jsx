@@ -149,15 +149,16 @@ export function RepetitionGroupDetail({ group, allGroups, evidence, onOpenLine }
     },
     { key: 'contractorCode', label: 'Contratista' },
   ];
+  // Tres partes separadas: los registros que forman el grupo, la evidencia disponible y la interpretación (que no se hace).
   return (
     <div className="drill-section">
+      <h3>1 · Registros repetidos en Prefactura</h3>
       <p className="explanation">
-        <strong>{REPETITION_KINDS[group.kind]}.</strong> {KIND_NOTES[group.kind]}{' '}
+        <strong>{REPETITION_KINDS[group.kind]}.</strong> Criterio del grupo: {KIND_NOTES[group.kind]} {group.rows.length} línea(s)
         {group.extraRows
-          ? `${group.extraRows} copia(s) extra por ${money(group.extraAmount)}, incluidas en el total sin descontar.`
-          : ''}
+          ? `; ${group.extraRows} copia(s) extra por ${money(group.extraAmount)}, incluidas en el total informado sin descontar.`
+          : '.'}
       </p>
-      <h3>Líneas del grupo</h3>
       <DataTable
         rows={group.rows}
         rowKey={(row) => row.id}
@@ -173,7 +174,7 @@ export function RepetitionGroupDetail({ group, allGroups, evidence, onOpenLine }
           },
         ]}
       />
-      <h3>Nómina de la misma clave</h3>
+      <h3>2 · Evidencia disponible: Nómina de la misma clave</h3>
       <p className="drill-note">
         Clave de conciliación: año {group.rows[0].year ?? '—'}, semana {group.rows[0].week}, {group.rows[0].hacienda} · suerte{' '}
         {group.rows[0].suerte}, {group.rows[0].labor} · {group.rows[0].service}, {group.rows[0].unit}.
@@ -188,7 +189,7 @@ export function RepetitionGroupDetail({ group, allGroups, evidence, onOpenLine }
           <p className="explanation">
             Nómina registra {unitsText(evidence.payrollUnits)} en {evidence.payrollRows.length} fila(s). Las{' '}
             {evidence.keyLines.length} línea(s) de Prefactura de la clave suman {unitsText(evidence.keyUnits)} (
-            {money(evidence.keyAmount)}). Se muestran para revisión; la aplicación no califica el caso.
+            {money(evidence.keyAmount)}).
           </p>
           <DataTable
             rows={evidence.payrollRows}
@@ -225,6 +226,12 @@ export function RepetitionGroupDetail({ group, allGroups, evidence, onOpenLine }
           columns={lineColumns}
         />
       </details>
+      <h3>3 · Interpretación</h3>
+      <p className="explanation drill-interpretation">
+        La aplicación no califica este grupo ni concluye si hay un cobro indebido: la coincidencia de campos no lo demuestra y
+        puede haber justificación operativa. Los registros y la evidencia se muestran para revisión; la interpretación corresponde
+        a la auditoría operativa, que se trabaja por separado.
+      </p>
     </div>
   );
 }
