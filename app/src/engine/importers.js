@@ -7,17 +7,20 @@
 // - devuelve metadatos del archivo (SHA-256, fechas, semanas) para trazabilidad.
 //
 // Identificador de fila: hash del contenido completo de la fila + número de aparición. Es estable
-// aunque cambie el nombre del archivo o el orden de las filas.
-import { read as readWorkbook, utils as XLSXUtils } from 'xlsx';
+// aunque cambie el nombre del archivo o el orden de las filas, y no depende de la zona horaria del equipo.
+import { SSF, read as readWorkbook, utils as XLSXUtils } from 'xlsx';
 import {
+  biffSerialToDate,
   cleanCode,
   extractContractorCode,
   hashId,
+  localWallToManagua,
   normalizeSuerte,
   normalizeText,
   parseNumberCell,
   toIsoDate,
   toNumber,
+  xlsxSerialToDate,
 } from './normalize';
 import { operationalYear, parsePeriodoText } from './periods';
 
@@ -130,9 +133,45 @@ const sha256Hex = async (buffer) => {
     .join('');
 };
 
+/** Aplica `convert` a cada celda de las hojas del libro. */
+const eachCell = (workbook, convert) => {
+  for (const sheet of Object.values(workbook.Sheets))
+    for (const [address, cell] of Object.entries(sheet)) if (address[0] !== '!' && cell) convert(cell);
+};
+
+/**
+ * Lee el libro con las fechas independientes de la zona horaria del equipo (ver normalize.js).
+ * - .xlsx (ZIP) y .xls (BIFF): se leen los seriales de Excel y se convierten las celdas con formato de fecha, el
+ *   mismo criterio con que SheetJS (cellDates) las convertía.
+ * - Otros formatos (HTML, XML, CSV): SheetJS crea la fecha desde el texto con la hora del equipo; se toma esa
+ *   hora de pared.
+ */
+export const readExcelWorkbook = (buffer) => {
+  const bytes = new Uint8Array(buffer, 0, Math.min(2, buffer.byteLength));
+  const serialToDate =
+    bytes[0] === 0x50 && bytes[1] === 0x4b ? xlsxSerialToDate : bytes[0] === 0xd0 && bytes[1] === 0xcf ? biffSerialToDate : null;
+  if (!serialToDate) {
+    const workbook = readWorkbook(buffer, { type: 'array', cellDates: true });
+    eachCell(workbook, (cell) => {
+      if (cell.t === 'd' && cell.v instanceof Date && !Number.isNaN(cell.v.getTime())) cell.v = localWallToManagua(cell.v);
+    });
+    return workbook;
+  }
+  const workbook = readWorkbook(buffer, { type: 'array', cellDates: false, cellNF: true });
+  eachCell(workbook, (cell) => {
+    if (cell.t !== 'n' || !cell.z || !SSF.is_date(cell.z)) return;
+    const date = serialToDate(cell.v);
+    if (date && !Number.isNaN(date.getTime())) {
+      cell.t = 'd';
+      cell.v = date;
+    }
+  });
+  return workbook;
+};
+
 const openWorkbook = async (file) => {
   const buffer = await file.arrayBuffer();
-  return { buffer, workbook: readWorkbook(buffer, { type: 'array', cellDates: true }) };
+  return { buffer, workbook: readExcelWorkbook(buffer) };
 };
 
 /** Lector de celdas por nombre canónico de columna. */

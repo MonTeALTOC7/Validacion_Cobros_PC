@@ -38,10 +38,11 @@ fijado. Todo es bloqueante. No publica ni escribe en otros repositorios.
 | `src/storage/` | IndexedDB `conciliador-casur` (Dexie, **esquema v1 fijo**): valores, auditoría, cierres, respaldo. |
 | `src/state/` | `useConciliador`: estado y acciones (carga, importación, conciliación, Maestro, respaldo). |
 | `src/components/` | Interfaz por módulo (Resumen, Conciliación, Revisión, Seguimiento, Financiero, TPS, Auditoría, Carga, Parámetros). |
-| `tests/unit/` | Casos controlados con Excel sintéticos. |
-| `tests/e2e/` | Prueba de humo, ruta de actualización, comparación contra el legacy y compatibilidad con la App Maestra (`maestra-compat.mjs`). |
+| `tests/unit/` | Casos controlados con Excel sintéticos; `timezone.test.js` repite las cifras de referencia en varias zonas horarias. |
+| `tests/e2e/` | Prueba de humo, ruta de actualización, zona horaria (`timezone.mjs`), comparación contra el legacy y compatibilidad con la App Maestra (`maestra-compat.mjs`). |
 | `tests/golden/` | Cifras de referencia, diferencias legacy permitidas y registro justificado. |
 | `tests/legacy/` | Copia exacta del bundle publicado 8b3-1-1 (solo para comparar), con `SHA256SUMS`. |
+| `tests/v08/` | Copia exacta del build v0.8 previo a la corrección de zona horaria (`3ca0876`), para probar la transición de datos guardados. |
 | `scripts/` | `release` (copia a la raíz), `verify-release`, `verify-legacy`, `golden-update`, `golden-guard`. |
 | `tools/` | Reconstrucción de la fuente y utilidades de renombrado (trazabilidad). |
 
@@ -55,6 +56,10 @@ fijado. Todo es bloqueante. No publica ni escribe en otros repositorios.
 - **Formato de `seguimiento.json`** publicado para la App Maestra: mismos campos de v0.7 (`PUBLISHED_FIELDS` en
   `src/engine/published.js`; se agregan `ageNote`, `sourceRow`, `year` y `maxPeriod`). Sin tarifas, montos ni P.FACT.
 - No se recalculan montos: los totales financieros son la columna `Total` de la Prefactura.
+- **Fechas de Excel independientes de la zona horaria.** Los libros se leen con `readExcelWorkbook` (seriales de Excel,
+  no `cellDates`), y cada celda de fecha conserva el instante que SheetJS producía en Managua, porque de él depende el
+  identificador de cada fila. No convertir fechas con `toISOString()` ni con la hora local del equipo (ver
+  `src/engine/normalize.js` y la sección 11 de `docs/CAMBIOS_v0.8.md`).
 
 ## Reglas del motor
 

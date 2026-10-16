@@ -54,8 +54,12 @@ export async function launch() {
 }
 
 /** Abre la app, espera a que la precarga deje un análisis en IndexedDB y devuelve el estado guardado. */
-export async function openAndWait(browser, url, { viewport = { width: 1366, height: 900 }, blockRemote = true } = {}) {
-  const context = await browser.newContext({ timezoneId: 'America/Managua', viewport, serviceWorkers: 'block' });
+export async function openAndWait(
+  browser,
+  url,
+  { viewport = { width: 1366, height: 900 }, blockRemote = true, timezoneId = 'America/Managua' } = {},
+) {
+  const context = await browser.newContext({ timezoneId, viewport, serviceWorkers: 'block' });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));

@@ -1,9 +1,11 @@
 # Validación automática del conciliador (solo lectura: no publica, no fusiona, no escribe en otros repositorios).
 # - Instalación reproducible (npm ci con package-lock), formato, pruebas unitarias.
-# - Copia legacy de referencia idéntica a e7587c3.
+# - Copias de referencia idénticas: legacy v0.7 (e7587c3) y build v0.8 previo a la corrección de zona horaria (3ca0876).
 # - `npm run release` reproduce exactamente el build que está en la raíz (lo que sirve GitHub Pages) sin borrar
 #   archivos necesarios.
 # - Cifras de referencia (golden) bloqueantes: resultados del motor sobre datos/ y registro justificado de cambios.
+# - Fechas e identificadores independientes de la zona horaria: pruebas unitarias también en Asia/Tokyo y en el
+#   navegador en varias zonas, con la transición desde el build v0.8 previo (tests/v08).
 # - Pruebas de navegador: humo (build y raíz), actualización desde v0.7 y comparación con el legacy contra la lista de
 #   diferencias permitidas (bloqueante).
 # - Compatibilidad obligatoria con la vista de labores de la App Maestra, examinada en un commit fijo (solo lectura).
@@ -57,6 +59,9 @@ jobs:
       - name: Pruebas unitarias y cifras de referencia (golden)
         run: npm test
 
+      - name: Pruebas unitarias y cifras de referencia en otra zona horaria (Asia/Tokyo)
+        run: TZ=Asia/Tokyo npx vitest run --exclude tests/unit/timezone.test.js
+
       - name: Registro de cifras de referencia (solo crece; cambios visibles)
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -68,10 +73,11 @@ jobs:
           fi
           node scripts/golden-guard.mjs "$BASE"
 
-      - name: Copia legacy idéntica a la referencia
+      - name: Copias de referencia idénticas (legacy v0.7 y build v0.8 previo)
         run: |
           (cd tests/legacy && sha256sum -c SHA256SUMS)
           node scripts/verify-legacy.mjs
+          (cd tests/v08 && sha256sum -c SHA256SUMS)
 
       - name: Build y release
         run: npm run release
@@ -97,6 +103,9 @@ jobs:
 
       - name: Actualización desde v0.7 en el mismo origen
         run: node tests/e2e/upgrade.mjs
+
+      - name: Zona horaria del equipo y transición desde v0.8 previo
+        run: node tests/e2e/timezone.mjs --site ..
 
       - name: Comparación con el legacy (solo diferencias permitidas)
         run: node tests/e2e/compare-legacy.mjs --allowlist tests/golden/legacy-allowlist.json --out ../compare-legacy.json
