@@ -1,0 +1,152 @@
+# Validación automática del conciliador (solo lectura: no publica, no fusiona, no escribe en otros repositorios).
+# - Instalación reproducible (npm ci con package-lock), formato, pruebas unitarias.
+# - Copias de referencia idénticas: legacy v0.7 (e7587c3) y build v0.8 previo a la corrección de zona horaria (3ca0876).
+# - `npm run release` reproduce exactamente el build que está en la raíz (lo que sirve GitHub Pages) sin borrar
+#   archivos necesarios.
+# - Cifras de referencia (golden) bloqueantes: resultados del motor sobre datos/ y registro justificado de cambios.
+# - Fechas e identificadores independientes de la zona horaria: pruebas unitarias también en Asia/Tokyo y en el
+#   navegador en varias zonas, con la transición desde el build v0.8 previo (tests/v08).
+# - Pruebas de navegador: humo (build y raíz), actualización desde v0.7 y comparación con el legacy contra la lista de
+#   diferencias permitidas (bloqueante).
+# - Compatibilidad obligatoria con la vista de labores de la App Maestra, examinada en un commit fijo (solo lectura).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Commit de la App Maestra examinado por la regresión de compatibilidad (referencia reproducible).
+  # Se actualiza a propósito, con un cambio visible en este archivo, cuando la App Maestra publique una versión nueva.
+  MAESTRA_REPO: MonTeALTOC7/negocios_de_cana_casur_app
+  MAESTRA_REF: 938e809a6e6ddae0f8e1c4c2f2f1500a5f6527dc
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: app
+    env:
+      TZ: America/Managua
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # el historial permite comparar tests/legacy con el commit e7587c3
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Instalación reproducible
+        run: npm ci
+
+      - name: Formato
+        run: npx prettier --check src tests scripts
+
+      - name: Pruebas unitarias y cifras de referencia (golden)
+        run: npm test
+
+      - name: Pruebas unitarias y cifras de referencia en otra zona horaria (Asia/Tokyo)
+        run: TZ=Asia/Tokyo npx vitest run --exclude tests/unit/timezone.test.js
+
+      - name: Registro de cifras de referencia (solo crece; cambios visibles)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            BASE="${{ github.event.before }}"
+          else
+            BASE=""
+          fi
+          node scripts/golden-guard.mjs "$BASE"
+
+      - name: Copias de referencia idénticas (legacy v0.7 y build v0.8 previo)
+        run: |
+          (cd tests/legacy && sha256sum -c SHA256SUMS)
+          node scripts/verify-legacy.mjs
+          (cd tests/v08 && sha256sum -c SHA256SUMS)
+
+      - name: Build y release
+        run: npm run release
+
+      - name: El release coincide con la raíz versionada y conserva los archivos necesarios
+        run: |
+          node scripts/verify-release.mjs
+          cd ..
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::La raíz versionada no coincide con el build de la fuente. Ejecute 'npm run release' en app/ y versione el resultado."
+            git status --porcelain
+            exit 1
+          fi
+
+      - name: Instalar Chromium para las pruebas de navegador
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Humo (app/dist)
+        run: node tests/e2e/smoke.mjs
+
+      - name: Humo (raíz publicada)
+        run: node tests/e2e/smoke.mjs --site ..
+
+      - name: Actualización desde v0.7 en el mismo origen
+        run: node tests/e2e/upgrade.mjs
+
+      - name: Zona horaria del equipo y transición desde v0.8 previo
+        run: node tests/e2e/timezone.mjs --site ..
+
+      - name: Comparación con el legacy (solo diferencias permitidas)
+        run: node tests/e2e/compare-legacy.mjs --allowlist tests/golden/legacy-allowlist.json --out ../compare-legacy.json
+
+      - name: Repositorio de la App Maestra en el commit fijado (solo lectura)
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.MAESTRA_REPO }}
+          ref: ${{ env.MAESTRA_REF }}
+          path: maestra
+          sparse-checkout: modules/labores
+          persist-credentials: false
+
+      - name: Código de la App Maestra examinado
+        working-directory: maestra
+        run: |
+          HEAD_SHA=$(git rev-parse HEAD)
+          if [ "$HEAD_SHA" != "$MAESTRA_REF" ]; then echo "::error::Se esperaba $MAESTRA_REF y se obtuvo $HEAD_SHA"; exit 1; fi
+          test -f modules/labores/index.html && test -f modules/labores/data/seguimiento.json
+          {
+            echo "## App Maestra examinada"
+            echo ""
+            echo "- Repositorio: \`$MAESTRA_REPO\` · commit \`$HEAD_SHA\`"
+            echo "- SHA-256 de los archivos de \`modules/labores\`:"
+            echo '```'
+            find modules/labores -type f -not -path '*/datos/*' | sort | xargs sha256sum
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY" > ../maestra-ref.txt
+
+      - name: Compatibilidad con la vista de labores de la App Maestra (obligatoria)
+        run: |
+          node tests/e2e/upgrade.mjs --labores ../maestra/modules/labores
+          npx vite-node tests/e2e/maestra-compat.mjs -- --labores ../maestra/modules/labores --out ../maestra-compat.json
+
+      - name: Informes
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: informes
+          path: |
+            compare-legacy.json
+            maestra-compat.json
+            maestra-ref.txt
+          if-no-files-found: ignore

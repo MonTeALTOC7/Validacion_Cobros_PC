@@ -1,0 +1,8 @@
+tests/legacy/
+tests/v08/
+dist/
+# Hoja de estilos v0.7 extraída tal cual del bundle publicado (se conserva sin reformatear para trazabilidad).
+src/styles.css
+# Cifras de referencia: se generan con scripts/golden-update.mjs y sus huellas están en el registro; no reformatear.
+tests/golden/*.json
+tests/golden/*.md

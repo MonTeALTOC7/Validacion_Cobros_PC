@@ -1,0 +1,422 @@
+{
+  "datos": {
+    "manifest": "2026-10-14",
+    "sha256": {
+      "Nomina_2026.xlsx": "e6a37e977c11cc6b0a4241d88ff7cf676ee5d9cd493f9457724c8034ef18fb85",
+      "Prefactura_2026.xlsx": "c775b5a8bfa05cccc1992c964e0782c384d68117b8a74552f0302cd8dbfccee9",
+      "Cronologico_Maestro_2026.xlsx": "31bf9f9c0a85d04dbfc664fc5956c20f497631e4983f813d1c49d7b3b9c409f3"
+    }
+  },
+  "parametros": {
+    "startDate": "2026-01-01",
+    "scope": "PRODUCERS",
+    "tpsWeeksBefore": 2,
+    "tpsWeeksAfter": 1,
+    "toleranceDH": 0.01,
+    "toleranceHA": 0.01,
+    "toleranceMJO": 0.01,
+    "tolerancePAQ": 0.01,
+    "includeHistoricalInactive": true,
+    "atypicalTariffPct": 5,
+    "tpsConfirmedExceptions": [
+      "16255|SALVADOR MARENCO CASTILLO|02",
+      "16254|JOSE ANDRES PEREZ ALEMAN|10",
+      "16257|CARLOS SIEZAR MORALES|02",
+      "16381|PANSACO|25"
+    ]
+  },
+  "importacion": {
+    "payroll": {
+      "filas": 13020,
+      "descartadas": 0,
+      "motivos": {}
+    },
+    "prefactura": {
+      "filas": 4452,
+      "descartadas": 0,
+      "motivos": {}
+    },
+    "master": {
+      "filas": 1315,
+      "descartadas": 0,
+      "motivos": {}
+    }
+  },
+  "conciliacion": {
+    "motor": 2,
+    "periodoInicial": "2026-S02",
+    "hallazgos": 2348,
+    "porTipo": {
+      "DIRECT": 2183,
+      "EXCEPTION": 3,
+      "EXCLUDED": 131,
+      "EXTERNAL_TPS": 10,
+      "TPS": 17,
+      "TPS_STAGE": 4
+    },
+    "porEstado": {
+      "COBRO_EXCESO": 74,
+      "COBRO_SIN_NOMINA": 14,
+      "CONCILIADO": 1945,
+      "ETAPA_TPS_SIN_PAQUETE": 4,
+      "EXCEPCION_CAP_VALIDADA": 3,
+      "EXCLUIDO_AAM": 9,
+      "NOMINA_SIN_COBRO": 134,
+      "PAQUETE_TPS_VALIDADO_RYA": 3,
+      "PAQUETE_TPS_VALIDADO_RYA_CORROBORADO": 9,
+      "SEPARADO_CS2661": 122,
+      "SUERTE_HISTORICA_DADA_DE_BAJA": 17,
+      "TPS_COBRADO_CON_DIFERENCIA_NOMINA": 4,
+      "TPS_EXTERNO_VALIDO": 10
+    },
+    "porBandera": {
+      "DUPLICADO_POTENCIAL": 2,
+      "LOTE_NO_ENCONTRADO": 2,
+      "MISMA_CANTIDAD_TARIFA_DISTINTA": 28,
+      "REPETICION_RESPALDADA": 3,
+      "TARIFA_POCO_FRECUENTE": 34
+    },
+    "porEstadoDeCobro": {
+      "COBRADO": 2052,
+      "SIN_BASE_NOMINA": 14,
+      "SIN_COBRO": 134
+    },
+    "cobertura": {
+      "base": 2186,
+      "unpaid": 134,
+      "partial": 0,
+      "covered": 2052,
+      "percent": 93.87
+    },
+    "pendientes": {
+      "casos": 134,
+      "enSemanasPrefacturadas": 5,
+      "enSemanasSinPrefactura": 129,
+      "sinCalendario": 0,
+      "ultimaSemanaPrefacturada": "2026-S39",
+      "porSemana": {
+        "2026-S24": 1,
+        "2026-S27": 1,
+        "2026-S31": 1,
+        "2026-S32": 1,
+        "2026-S35": 1,
+        "2026-S40": 45,
+        "2026-S41": 49,
+        "2026-S42": 35
+      },
+      "unidades": {
+        "D-H": 159.45,
+        "HA": 223.64,
+        "MJO": 1745,
+        "PAQ": 250
+      }
+    },
+    "excesoUnidades": {
+      "CAJAS": 4000,
+      "D-H": 53.9,
+      "HA": 53.78
+    },
+    "porSemanaYEstado": {
+      "2026-S02": {
+        "CONCILIADO": 35
+      },
+      "2026-S03": {
+        "CONCILIADO": 42,
+        "SUERTE_HISTORICA_DADA_DE_BAJA": 1
+      },
+      "2026-S04": {
+        "CONCILIADO": 14,
+        "SEPARADO_CS2661": 9,
+        "SUERTE_HISTORICA_DADA_DE_BAJA": 1
+      },
+      "2026-S05": {
+        "CONCILIADO": 40
+      },
+      "2026-S06": {
+        "CONCILIADO": 44,
+        "EXCLUIDO_AAM": 6,
+        "SUERTE_HISTORICA_DADA_DE_BAJA": 2
+      },
+      "2026-S07": {
+        "CONCILIADO": 65,
+        "SEPARADO_CS2661": 20,
+        "EXCLUIDO_AAM": 3,
+        "SUERTE_HISTORICA_DADA_DE_BAJA": 2
+      },
+      "2026-S08": {
+        "CONCILIADO": 64
+      },
+      "2026-S09": {
+        "CONCILIADO": 54
+      },
+      "2026-S10": {
+        "CONCILIADO": 66,
+        "SEPARADO_CS2661": 35,
+        "SUERTE_HISTORICA_DADA_DE_BAJA": 2
+      },
+      "2026-S11": {
+        "CONCILIADO": 82
+      },
+      "2026-S12": {
+        "CONCILIADO": 65
+      },
+      "2026-S13": {
+        "CONCILIADO": 68,
+        "SUERTE_HISTORICA_DADA_DE_BAJA": 2
+      },
+      "2026-S14": {
+        "CONCILIADO": 58
+      },
+      "2026-S15": {
+        "CONCILIADO": 35,
+        "SEPARADO_CS2661": 20
+      },
+      "2026-S16": {
+        "CONCILIADO": 49
+      },
+      "2026-S17": {
+        "CONCILIADO": 48
+      },
+      "2026-S18": {
+        "TPS_EXTERNO_VALIDO": 2,
+        "CONCILIADO": 61,
+        "SUERTE_HISTORICA_DADA_DE_BAJA": 2
+      },
+      "2026-S19": {
+        "PAQUETE_TPS_VALIDADO_RYA_CORROBORADO": 1,
+        "CONCILIADO": 59
+      },
+      "2026-S20": {
+        "CONCILIADO": 30,
+        "PAQUETE_TPS_VALIDADO_RYA_CORROBORADO": 2,
+        "PAQUETE_TPS_VALIDADO_RYA": 1,
+        "TPS_EXTERNO_VALIDO": 2,
+        "COBRO_EXCESO": 21,
+        "SUERTE_HISTORICA_DADA_DE_BAJA": 2,
+        "COBRO_SIN_NOMINA": 2
+      },
+      "2026-S21": {
+        "CONCILIADO": 62,
+        "PAQUETE_TPS_VALIDADO_RYA_CORROBORADO": 2,
+        "TPS_EXTERNO_VALIDO": 1
+      },
+      "2026-S22": {
+        "COBRO_EXCESO": 11,
+        "CONCILIADO": 50,
+        "COBRO_SIN_NOMINA": 5
+      },
+      "2026-S23": {
+        "CONCILIADO": 52,
+        "SEPARADO_CS2661": 11,
+        "SUERTE_HISTORICA_DADA_DE_BAJA": 2
+      },
+      "2026-S24": {
+        "NOMINA_SIN_COBRO": 1,
+        "CONCILIADO": 48,
+        "SUERTE_HISTORICA_DADA_DE_BAJA": 1,
+        "PAQUETE_TPS_VALIDADO_RYA_CORROBORADO": 2
+      },
+      "2026-S25": {
+        "CONCILIADO": 43
+      },
+      "2026-S26": {
+        "CONCILIADO": 54,
+        "PAQUETE_TPS_VALIDADO_RYA": 1,
+        "TPS_COBRADO_CON_DIFERENCIA_NOMINA": 3,
+        "TPS_EXTERNO_VALIDO": 3
+      },
+      "2026-S27": {
+        "CONCILIADO": 57,
+        "PAQUETE_TPS_VALIDADO_RYA_CORROBORADO": 2,
+        "COBRO_SIN_NOMINA": 1,
+        "COBRO_EXCESO": 4,
+        "NOMINA_SIN_COBRO": 1
+      },
+      "2026-S28": {
+        "CONCILIADO": 50,
+        "PAQUETE_TPS_VALIDADO_RYA": 1,
+        "TPS_EXTERNO_VALIDO": 2
+      },
+      "2026-S29": {
+        "CONCILIADO": 54
+      },
+      "2026-S30": {
+        "COBRO_EXCESO": 6,
+        "CONCILIADO": 56,
+        "COBRO_SIN_NOMINA": 5
+      },
+      "2026-S31": {
+        "CONCILIADO": 37,
+        "COBRO_EXCESO": 14,
+        "NOMINA_SIN_COBRO": 1,
+        "ETAPA_TPS_SIN_PAQUETE": 3
+      },
+      "2026-S32": {
+        "CONCILIADO": 38,
+        "NOMINA_SIN_COBRO": 1,
+        "COBRO_SIN_NOMINA": 1,
+        "COBRO_EXCESO": 18,
+        "EXCEPCION_CAP_VALIDADA": 3,
+        "TPS_COBRADO_CON_DIFERENCIA_NOMINA": 1
+      },
+      "2026-S33": {
+        "CONCILIADO": 51
+      },
+      "2026-S34": {
+        "CONCILIADO": 42
+      },
+      "2026-S35": {
+        "CONCILIADO": 44,
+        "NOMINA_SIN_COBRO": 1
+      },
+      "2026-S36": {
+        "CONCILIADO": 55,
+        "ETAPA_TPS_SIN_PAQUETE": 1,
+        "SEPARADO_CS2661": 17
+      },
+      "2026-S37": {
+        "CONCILIADO": 62,
+        "SEPARADO_CS2661": 10
+      },
+      "2026-S38": {
+        "CONCILIADO": 58
+      },
+      "2026-S39": {
+        "CONCILIADO": 53
+      },
+      "2026-S40": {
+        "NOMINA_SIN_COBRO": 45
+      },
+      "2026-S41": {
+        "NOMINA_SIN_COBRO": 49
+      },
+      "2026-S42": {
+        "NOMINA_SIN_COBRO": 35
+      }
+    }
+  },
+  "finanzas": {
+    "total": 13278583.33,
+    "lineas": 4452,
+    "prefacturas": 274,
+    "productores": 30,
+    "fincas": 30,
+    "porUniverso": {
+      "CONCILIABLE": 6082499.51,
+      "FUERA_CONCILIACION": 1724151.23,
+      "MECANIZADA_CASUR": 5471932.59
+    },
+    "porTipoDeLabor": {
+      "AEREA": 69844.17,
+      "CS2661": 1011941.06,
+      "MANUAL": 5074470.67,
+      "MECANIZADA": 5471932.59,
+      "TPS": 1008028.84,
+      "TPS_EXTERNO": 642366
+    },
+    "porContratista": {
+      "CS2661": 1011941.06,
+      "CS3317": 69844.17,
+      "CS3625": 642366,
+      "CS9999": 11554432.1
+    },
+    "areaSuertesHa": 1121.12,
+    "prefacturadoPorHaDeSuerte": 11844.03,
+    "haTrabajadas": 7348.01
+  },
+  "repeticiones": {
+    "DUPLICADO_EXACTO": {
+      "groups": 16,
+      "rows": 32,
+      "extraRows": 16,
+      "extraAmount": 105908.1,
+      "amount": 211816.2
+    },
+    "COBRO_EN_OTRA_PREFACTURA": {
+      "groups": 2,
+      "rows": 5,
+      "extraRows": 2,
+      "extraAmount": 18774.8,
+      "amount": 43293.46
+    },
+    "MISMA_CANTIDAD_TARIFA_DISTINTA": {
+      "groups": 28,
+      "rows": 56,
+      "extraRows": 0,
+      "extraAmount": 0,
+      "amount": 44616.32
+    },
+    "VARIAS_LINEAS_MISMA_CLAVE": {
+      "groups": 383,
+      "rows": 787,
+      "extraRows": 0,
+      "extraAmount": 0,
+      "amount": 1250283.28
+    }
+  },
+  "seguimiento": {
+    "filas": 13930,
+    "porOrigen": {
+      "Nómina": 12089,
+      "Prefactura": 1841
+    },
+    "porClasificacion": {
+      "Manual": 12082,
+      "Mecanizada": 1841,
+      "Paquete TPS": 7
+    },
+    "productores": 30,
+    "unidadesPorClasificacionYUM": {
+      "Manual|CAJAS": 93682,
+      "Manual|D-H": 4366.42,
+      "Manual|HA": 4127.55,
+      "Manual|MJO": 224827,
+      "Manual|PAQ": 1875,
+      "Manual|QQ": 138,
+      "Mecanizada|HA": 3118.39,
+      "Mecanizada|HR": 1,
+      "Paquete TPS|D-H": 7.1
+    },
+    "publicado": {
+      "filas": 13930,
+      "maxWeek": 42,
+      "maxPeriod": "2026-S42"
+    }
+  },
+  "calidad": {
+    "repetition-DUPLICADO_EXACTO": {
+      "severidad": "warning",
+      "casos": 16
+    },
+    "repetition-COBRO_EN_OTRA_PREFACTURA": {
+      "severidad": "warning",
+      "casos": 2
+    },
+    "date-outside-inferred-week": {
+      "severidad": "info",
+      "casos": 3
+    },
+    "repetition-MISMA_CANTIDAD_TARIFA_DISTINTA": {
+      "severidad": "info",
+      "casos": 28
+    },
+    "repetition-VARIAS_LINEAS_MISMA_CLAVE": {
+      "severidad": "info",
+      "casos": 383
+    },
+    "tariff-atypical": {
+      "severidad": "info",
+      "casos": 34
+    },
+    "lots-missing": {
+      "severidad": "info",
+      "casos": 4
+    }
+  },
+  "huellas": {
+    "hallazgos": "32f47d33a2c3a0b82972429b4138389e9c9262011ae2919e77a53b9756ede3a4",
+    "finanzas": "56aed11a3b7e31de9d0fe0520136534b38eafeb217c2c0cf1a720d9347c318ec",
+    "seguimiento": "947cb20c732d87d4254d02c52a1c003f020d6135ef9bc3448c05277ba1d97461",
+    "publicado": "3d06e6cfef987eff4bc5d121d3e4f22042feb321ee26dab8fe3d79d1fdd997ae"
+  }
+}
