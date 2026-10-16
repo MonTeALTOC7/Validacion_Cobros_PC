@@ -241,3 +241,46 @@ button.audit-period-card:not(:disabled):hover {
     margin: 12px 10px;
   }
 }
+
+.audit-mobile-hint {
+  display: none;
+}
+@media (max-width: 650px) {
+  /* Priorizar las dos tarifas en móvil; el detalle conserva muestras, MAD y referencia. */
+  .tariff-audit-module .audit-series ~ .table-wrap .data-table th:nth-child(2),
+  .tariff-audit-module .audit-series ~ .table-wrap .data-table td:nth-child(2),
+  .tariff-audit-module .audit-series ~ .table-wrap .data-table th:nth-child(3),
+  .tariff-audit-module .audit-series ~ .table-wrap .data-table td:nth-child(3),
+  .tariff-audit-module .audit-series ~ .table-wrap .data-table th:nth-child(6),
+  .tariff-audit-module .audit-series ~ .table-wrap .data-table td:nth-child(6),
+  .tariff-audit-module .audit-series ~ .table-wrap .data-table th:nth-child(7),
+  .tariff-audit-module .audit-series ~ .table-wrap .data-table td:nth-child(7) {
+    display: none;
+  }
+  .tariff-audit-module .audit-series ~ .table-wrap .data-table {
+    min-width: 0;
+    width: 100%;
+    table-layout: fixed;
+  }
+  .tariff-audit-module .audit-series ~ .table-wrap .data-table th,
+  .tariff-audit-module .audit-series ~ .table-wrap .data-table td {
+    padding: 9px 5px;
+    overflow-wrap: anywhere;
+    font-size: 11px;
+  }
+  .tariff-audit-module .audit-series ~ .table-wrap .data-table th .sort-button {
+    font-size: 10px;
+    white-space: normal;
+    text-align: right;
+  }
+  .tariff-audit-module .audit-series ~ .table-wrap .data-table th:first-child .sort-button {
+    text-align: left;
+  }
+  .audit-mobile-hint {
+    display: block;
+    margin: 4px 10px 12px;
+    color: #475d51;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+}
