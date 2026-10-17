@@ -89,6 +89,7 @@ jobs:
           if [ -n "$(git status --porcelain)" ]; then
             echo "::error::La raíz versionada no coincide con el build de la fuente. Ejecute 'npm run release' en app/ y versione el resultado."
             git status --porcelain
+            git diff -- sw.js
             exit 1
           fi
 
