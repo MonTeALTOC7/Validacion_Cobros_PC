@@ -83,7 +83,8 @@ try {
   await page.waitForTimeout(500);
   const loadText = await page.locator('main').innerText();
   check('Ofrece cargar los datos publicados nuevos', /datos publicados más recientes/i.test(loadText));
-  await page.locator('.sidebar nav button', { hasText: 'Auditoría y cierres' }).click();
+  await page.locator('.sidebar nav button', { hasText: 'Auditoría de tarifas y cobros' }).click();
+  await page.getByRole('button', { name: 'Historial y cierres', exact: true }).click();
   await page.waitForTimeout(500);
   check('Muestra el cierre v0.7 como histórico', /cierre v0\.7 sin año/i.test(await page.locator('main').innerText()));
   check('Sin errores de página', !errors.length, errors.join(' | '));

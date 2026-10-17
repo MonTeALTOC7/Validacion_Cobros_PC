@@ -21,6 +21,7 @@ export async function serve(mounts) {
   const entries = Object.entries(mounts).sort((a, b) => b[0].length - a[0].length);
   const server = http.createServer(async (req, res) => {
     const url = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    if (url === '/favicon.ico') return res.writeHead(204).end();
     const mount = entries.find(([prefix]) => url.startsWith(prefix));
     if (!mount) return res.writeHead(404).end();
     let file = path.join(mount[1], url.slice(mount[0].length) || 'index.html');
@@ -66,6 +67,7 @@ export async function openAndWait(
   page.on('console', (m) => m.type() === 'error' && !/ERR_FAILED|net::/.test(m.text()) && errors.push(m.text()));
   await page.route('**/*', (route) => {
     const u = route.request().url();
+    if (new URL(u).pathname === '/favicon.ico') return route.fulfill({ status: 204, body: '' });
     if (blockRemote && !u.startsWith('http://127.0.0.1')) return route.abort();
     return route.continue();
   });
