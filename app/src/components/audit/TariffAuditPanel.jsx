@@ -209,56 +209,62 @@ export function TariffAuditPanel(props) {
                           </small>
                         </div>
                       </div>
-                      <DataTable
-                        key={series.key}
-                        rows={periods}
-                        onRowClick={(group) =>
-                          openGroup(
-                            audit.rows.filter((row) => row.populationKey === group.key),
-                            `Comparables · ${group.service} · ${group.month}`,
-                          )
-                        }
-                        columns={[
-                          { key: 'month', label: 'Mes observado' },
-                          { key: 'rows', label: 'Líneas originales', num: true },
-                          {
-                            key: 'n',
-                            label: 'Muestras efectivas',
-                            num: true,
-                            value: (group) => group.effective.n,
-                            render: (group) => group.effective.n,
-                          },
-                          {
-                            key: 'reported',
-                            label: 'Mediana reportada',
-                            num: true,
-                            value: (group) => group.reported.median,
-                            render: (group) => number(group.reported.median),
-                          },
-                          {
-                            key: 'effective',
-                            label: 'Mediana efectiva',
-                            num: true,
-                            value: (group) => group.effective.median,
-                            render: (group) => number(group.effective.median),
-                          },
-                          {
-                            key: 'mad',
-                            label: 'MAD efectiva',
-                            num: true,
-                            value: (group) => group.effective.mad,
-                            render: (group) => number(group.effective.mad),
-                          },
-                          {
-                            key: 'reference',
-                            label: 'Referencia',
-                            render: (group) =>
-                              group.effective.sufficient
-                                ? `${number(group.effective.lower)} → ${number(group.effective.upper)} · exploratoria`
-                                : group.effective.reason,
-                          },
-                        ]}
-                      />
+                      <p className="audit-history-help">
+                        Mira cómo cambió la tarifa típica observada por mes, para el mismo servicio, unidad y contratista.
+                        No es una tarifa aprobada. Toca un mes para ver las muestras, sus límites y el origen.
+                      </p>
+                      <div className="audit-history-table">
+                        <DataTable
+                          key={series.key}
+                          rows={periods}
+                          onRowClick={(group) =>
+                            openGroup(
+                              audit.rows.filter((row) => row.populationKey === group.key),
+                              `Comparables · ${group.service} · ${group.month}`,
+                            )
+                          }
+                          columns={[
+                            { key: 'month', label: 'Mes observado' },
+                            {
+                              key: 'reported',
+                              label: 'Tarifa mostrada típica',
+                              num: true,
+                              value: (group) => group.reported.median,
+                              render: (group) => number(group.reported.median),
+                            },
+                            {
+                              key: 'effective',
+                              label: 'Tarifa efectiva típica',
+                              num: true,
+                              value: (group) => group.effective.median,
+                              render: (group) => number(group.effective.median),
+                            },
+                            { key: 'rows', label: 'Líneas originales', num: true },
+                            {
+                              key: 'n',
+                              label: 'Muestras efectivas',
+                              num: true,
+                              value: (group) => group.effective.n,
+                              render: (group) => group.effective.n,
+                            },
+                            {
+                              key: 'mad',
+                              label: 'MAD efectiva',
+                              num: true,
+                              value: (group) => group.effective.mad,
+                              render: (group) => number(group.effective.mad),
+                            },
+                            {
+                              key: 'reference',
+                              label: 'Referencia',
+                              render: (group) =>
+                                group.effective.sufficient
+                                  ? `${number(group.effective.lower)} → ${number(group.effective.upper)} · exploratoria`
+                                  : group.effective.reason,
+                            },
+                          ]}
+                        />
+                      </div>
                     </>
                   )}
                 </Panel>
