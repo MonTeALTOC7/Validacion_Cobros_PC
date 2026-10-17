@@ -46,6 +46,7 @@ try {
     const view = async (name) =>
       module.locator('nav[aria-label="Vistas de auditoría"]').getByRole('button', { name, exact: true }).click();
     const metric = (name) => module.locator('.metric-action', { hasText: name });
+    await module.locator('.audit-technical-summary summary').click();
     check(
       `${device}: cobertura real y total original`,
       /2026-01-02 → 2026-09-20/.test(await module.innerText()) &&
@@ -59,7 +60,55 @@ try {
       `${device}: página sin desbordamiento horizontal`,
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
     );
+    await module.locator('.audit-technical-summary summary').click();
+    check(
+      `${device}: bandeja operativa con campos y referencias`,
+      /Cobros que requieren revisión/.test(await module.innerText()) &&
+        /Tarifa reportada/i.test(await module.innerText()) &&
+        /Tarifa efectiva/i.test(await module.innerText()) &&
+        /Referencia observada/i.test(await module.innerText()),
+    );
+    const queue = module.locator('.operational-queue');
+    const uniqueCount = Number(await queue.locator('[data-tariff-review-count]').getAttribute('data-tariff-review-count'));
+    const visibleRows = () => queue.locator(device === 'PC' ? '.tariff-review-table tbody tr' : '.tariff-review-card');
+    const firstPage = await visibleRows().evaluateAll((items) => items.map((item) => item.dataset.tariffReviewId));
+    await queue.getByRole('button', { name: 'Siguiente', exact: true }).click();
+    const secondPage = await visibleRows().evaluateAll((items) => items.map((item) => item.dataset.tariffReviewId));
+    check(
+      `${device}: paginación sin duplicar registros`,
+      firstPage.length === 8 && secondPage.length === 8 && !firstPage.some((id) => secondPage.includes(id)),
+    );
+    await queue.getByRole('button', { name: 'Anterior', exact: true }).click();
+    await queue.getByRole('button', { name: /Casos sin respaldo suficiente/ }).click();
+    check(
+      `${device}: contador de respaldo coincide con su selección`,
+      Number(await queue.locator('[data-tariff-review-count]').getAttribute('data-tariff-review-count')) ===
+        Number(await queue.locator('.tariff-review-counter').nth(1).locator('strong').innerText()),
+    );
+    await queue.getByRole('button', { name: /Casos para revisar/ }).click();
+    check(
+      `${device}: contador de casos únicos consistente`,
+      Number(await queue.locator('[data-tariff-review-count]').getAttribute('data-tariff-review-count')) === uniqueCount,
+    );
     if (shots) await page.screenshot({ path: path.join(shots, `${device}-resumen.png`), fullPage: true });
+    await queue.getByLabel('Buscar un cobro').fill('1376');
+    const queueOpener = queue.locator('button[aria-label="Abrir evidencia de fila 1376"]:visible');
+    await queueOpener.click();
+    check(
+      `${device}: ficha explica motivo, comparación y acción`,
+      /Qué se detectó/.test(await page.locator('.drill-drawer').innerText()) &&
+        /Qué corresponde verificar/.test(await page.locator('.drill-drawer').innerText()) &&
+        /tarifa reportada está por debajo/.test(await page.locator('.drill-drawer').innerText()),
+    );
+    if (shots) await page.screenshot({ path: path.join(shots, `${device}-guia-cmn.png`) });
+    await page.keyboard.press('Escape');
+    check(
+      `${device}: bandeja conserva búsqueda y foco`,
+      (await queueOpener.evaluate((element) => element === document.activeElement)) &&
+        (await queue.getByLabel('Buscar un cobro').inputValue()) === '1376',
+    );
+    await queue.getByLabel('Buscar un cobro').fill('');
+    await module.locator('.audit-technical-summary summary').click();
     const count = Number(await metric('Extremos prioritarios').locator('strong').innerText());
     await metric('Extremos prioritarios').click();
     check(
@@ -76,6 +125,7 @@ try {
     await page.keyboard.press('Enter');
     const drawer = page.locator('.drill-drawer');
     await drawer.waitFor();
+    await drawer.locator('.audit-evidence-technical summary').click();
     const evidence = await drawer.innerText();
     check(
       `${device}: origen, productor, P.FACT y CMN 0,88`,
@@ -120,7 +170,8 @@ try {
         (await page.getByLabel('Buscar evidencia').inputValue()) === '1376' &&
         (await opener.evaluate((element) => element === document.activeElement)),
     );
-    await view('Resumen ejecutivo');
+    await view('Pendientes de revisión');
+    await module.locator('.audit-technical-summary summary').click();
     await metric('Importe informado').click();
     check(
       `${device}: desglose conserva C$13,278,583.33`,
@@ -140,12 +191,19 @@ try {
     if (device === 'móvil')
       check('móvil: detalle a ancho completo', Math.abs((await drawer.boundingBox()).width - viewport.width) < 2);
     await drawer.getByRole('button', { name: 'Cerrar detalle', exact: true }).click();
-    await view('Tarifas por período');
+    await view('Evolución de tarifas');
     const series = module.locator('.audit-series select');
     const cmn = await series
       .locator('option')
       .evaluateAll((options) => options.find((option) => option.textContent.startsWith('16013 · CMN · HA · CS9999')).value);
     await series.selectOption(cmn);
+    check(
+      `${device}: evolución sencilla y detalle técnico cerrado`,
+      (await module.locator('.evolution-month').count()) > 1 &&
+        !(await module.locator('.audit-history-technical').evaluate((element) => element.open)),
+    );
+    if (shots) await page.screenshot({ path: path.join(shots, `${device}-evolucion.png`), fullPage: true });
+    await module.locator('.audit-history-technical summary').click();
     const rates = await module.innerText();
     check(
       `${device}: comparación histórica sin diciembre ficticio`,
@@ -159,9 +217,14 @@ try {
       /Mes observado/i.test(rates) && /MAD efectiva/i.test(rates) && (await module.locator('tbody tr').count()) > 1,
     );
     if (shots) await page.screenshot({ path: path.join(shots, `${device}-historico.png`), fullPage: true });
+    await view('Todos los registros');
+    check(
+      `${device}: todos los registros sin filtro heredado`,
+      Number(await module.locator('[data-audit-count]').getAttribute('data-audit-count')) === 4452,
+    );
     await view('Historial y cierres');
     check(`${device}: panel de cierres original accesible`, (await module.locator('.week-controls button').count()) > 0);
-    await view('Resumen ejecutivo');
+    await view('Pendientes de revisión');
     await module.locator('.audit-method summary').click();
     await module.getByLabel('Mínimo de muestras').fill('15');
     await module.getByRole('button', { name: 'Recalcular auditoría', exact: true }).click();
@@ -202,6 +265,7 @@ try {
     await page.reload();
     await page.waitForTimeout(2500);
     await nav();
+    await module.locator('.audit-technical-summary summary').click();
     check(
       `${device}: auditoría funciona con Prefactura sola`,
       /1 líneas/.test(await module.innerText()) &&
@@ -209,6 +273,7 @@ try {
     );
     await metric('Presentación SIAGRI').click();
     await module.locator('tbody tr').first().click();
+    await drawer.locator('.audit-evidence-technical summary').click();
     check(
       `${device}: promedio presentado sin dictamen económico`,
       /483.0564/.test(await drawer.innerText()) &&
@@ -229,4 +294,4 @@ try {
   server.close();
 }
 console.log(`\n${results.filter((item) => item.passed).length}/${results.length} comprobaciones correctas`);
-if (results.some((item) => !item.passed) || results.length < 67) process.exitCode = 1;
+if (results.some((item) => !item.passed) || results.length < 83) process.exitCode = 1;
