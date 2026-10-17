@@ -1,3 +1,8 @@
 app/tests/legacy/** -text
 app/tests/golden/** -text
 app/tests/v08/** -text
+app/public/icon.svg text eol=lf
+app/public/casur-mark.svg text eol=lf
+icon.svg text eol=lf
+casur-mark.svg text eol=lf
+sw.js text eol=lf
