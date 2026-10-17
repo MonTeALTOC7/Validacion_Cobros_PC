@@ -1,8 +1,9 @@
 // V1: solo Prefactura, señales independientes, detalle B1, teclado, móvil y cero escrituras de auditoría.
 // Uso: node tests/e2e/tariff-audit.mjs [--site ..] [--shots carpeta]
 import path from 'node:path';
-import { mkdir } from 'node:fs/promises';
+import { copyFile, mkdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { read, utils } from 'xlsx';
 import { serve, launch, openAndWait, readDb } from './harness.mjs';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -46,6 +47,58 @@ try {
     const view = async (name) =>
       module.locator('nav[aria-label="Vistas de auditoría"]').getByRole('button', { name, exact: true }).click();
     const metric = (name) => module.locator('.metric-action', { hasText: name });
+    if (device === 'PC') {
+      const downloadFull = page.waitForEvent('download');
+      await module.getByRole('button', { name: /Toda la Prefactura/ }).click();
+      const fullFile = await downloadFull;
+      const fullBook = read(await readFile(await fullFile.path()), { type: 'buffer' });
+      const sampleDir = path.join(appDir, 'test-results');
+      await mkdir(sampleDir, { recursive: true });
+      await copyFile(await fullFile.path(), path.join(sampleDir, 'auditoria_tarifas_cobros_completa_muestra.xlsx'));
+      const fullRows = utils.sheet_to_json(fullBook.Sheets.Prefactura, { defval: '' });
+      const reviewRows = utils.sheet_to_json(fullBook.Sheets['Revisión única'], { defval: '' });
+      const insufficientRows = reviewRows.filter((row) => row.Motivos.includes('Comparables insuficientes'));
+      const cmnRow = fullRows.find((row) => row['Fila origen'] === 1376);
+      check(
+        'Excel completo reconcilia filas, importe, revisión deduplicada y CMN 0,88',
+        fullRows.length === 4452 &&
+          Math.abs(fullRows.reduce((total, row) => total + row['Total Prefactura'], 0) - 13278583.33) < 0.005 &&
+          reviewRows.length === 887 &&
+          new Set(reviewRows.map((row) => row['ID de auditoría'])).size === 887 &&
+          insufficientRows.length === 417 &&
+          cmnRow?.Labor === 'CMN' &&
+          cmnRow?.['Tarifa reportada'] === 0.88 &&
+          cmnRow?.Hoja === 'REPORTE',
+      );
+      check(
+        'Excel completo incluye evidencia, referencias, evolución y motivos',
+        [
+          'Resumen',
+          'Prefactura',
+          'Revisión única',
+          'Motivos (no sumar)',
+          'Referencias mensuales',
+          'Evolución',
+          'Evidencia',
+        ].every((name) => fullBook.SheetNames.includes(name)),
+      );
+      await view('Todos los registros');
+      await module.locator('.audit-filters label').filter({ hasText: 'Indicador' }).locator('select').selectOption('all');
+      await page.getByLabel('Buscar evidencia').fill('1376');
+      const downloadSelection = page.waitForEvent('download');
+      await module.getByRole('button', { name: /Selección actual/ }).click();
+      const selectionFile = await downloadSelection;
+      const selectionBook = read(await readFile(await selectionFile.path()), { type: 'buffer' });
+      const selectionRows = utils.sheet_to_json(selectionBook.Sheets.Prefactura, { defval: '' });
+      check(
+        'Excel de selección respeta filtros y conserva P.FACT como texto',
+        selectionRows.length === 1 &&
+          selectionRows[0]['Fila origen'] === 1376 &&
+          selectionRows[0]['P.FACT'] === '16183' &&
+          selectionBook.Sheets.Prefactura.A2.t === 's',
+      );
+      await view('Pendientes de revisión');
+    }
     await module.locator('.audit-technical-summary summary').click();
     check(
       `${device}: cobertura real y total original`,

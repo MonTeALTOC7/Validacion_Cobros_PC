@@ -9,6 +9,7 @@ import { FINANCE_UNIVERSES } from '../../engine/finance';
 import { formatCurrency, formatNumber } from '../../lib/format';
 import './tariff-audit.css';
 import { CaseExplanation, OperationalEvolution, OperationalQueue } from './OperationalAudit';
+import { exportTariffAuditWorkbook } from './tariffAuditExport';
 
 const number = (value) => (value == null || !Number.isFinite(value) ? 'No disponible' : formatNumber(value, 4));
 const amount = (value) => (value == null || !Number.isFinite(value) ? 'No disponible' : formatCurrency(value));
@@ -126,6 +127,22 @@ export function TariffAuditPanel(props) {
         <AuditPanel {...props} />
       ) : (
         <>
+          <div className="tariff-audit-export" aria-label="Exportar auditoría de tarifas">
+            <strong>Exportar Excel</strong>
+            <button
+              className="button secondary"
+              onClick={() => exportTariffAuditWorkbook(audit, inputs, { scope: 'complete', filters })}
+            >
+              Toda la Prefactura ({audit.rows.length.toLocaleString('es-NI')})
+            </button>
+            <button
+              className="button secondary"
+              disabled={!rows.length}
+              onClick={() => exportTariffAuditWorkbook(audit, inputs, { scope: 'selection', rows, filters })}
+            >
+              Selección actual ({rows.length.toLocaleString('es-NI')})
+            </button>
+          </div>
           <section className="audit-scope" aria-label="Alcance de la auditoría">
             <div>
               <span className="audit-eyebrow">PREFACTURA SIAGRI · ANÁLISIS EXPLORATORIO</span>

@@ -3,6 +3,26 @@
   display: grid;
   gap: 16px;
 }
+.tariff-audit-export {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #244634;
+  font-size: 12px;
+}
+.tariff-audit-export strong {
+  margin-right: 4px;
+}
+@media (max-width: 560px) {
+  .tariff-audit-export {
+    justify-content: flex-start;
+  }
+  .tariff-audit-export .button {
+    flex: 1 1 100%;
+  }
+}
 .audit-scope {
   background: #edf5f1;
   border: 1px solid #cbded4;
