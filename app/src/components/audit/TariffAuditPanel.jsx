@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { AuditPanel } from '../AuditPanel';
-import { EmptyState, Metric, Panel } from '../common';
+import { EmptyState, Panel } from '../common';
+import { AuditWorkQueue, caseExplanation, caseNextStep, caseType } from './AuditWorkQueue';
 import { DataTable } from '../common/DataTable';
 import { DrillDrawer } from '../drill/DrillDrawer';
 import { Field, LineFields } from '../drill/LineFields';
@@ -27,9 +28,9 @@ const categories = {
 };
 const DEFAULT_FILTERS = { search: '', category: 'observed', service: '', unit: '', contractorCode: '', universe: '', month: '' };
 const VIEWS = {
-  summary: 'Resumen ejecutivo',
-  rates: 'Tarifas por período',
-  discrepancies: 'Discrepancias',
+  summary: 'Qué revisar',
+  rates: 'Comparar tarifas',
+  discrepancies: 'Todos los cobros',
   history: 'Historial y cierres',
 };
 
@@ -125,8 +126,8 @@ export function TariffAuditPanel(props) {
           <section className="audit-scope" aria-label="Alcance de la auditoría">
             <div>
               <span className="audit-eyebrow">PREFACTURA SIAGRI · ANÁLISIS EXPLORATORIO</span>
-              <h2>Indicadores para revisar</h2>
-              <p>Tarifa autorizada no disponible / importe esperado no verificable.</p>
+              <h2>Revisión de cobros de Prefactura</h2>
+              <p>Encuentra tarifas inusuales y consulta el cobro original. No son errores confirmados.</p>
             </div>
             <div className="audit-coverage">
               <strong>{range(audit.coverage)}</strong>
@@ -142,90 +143,13 @@ export function TariffAuditPanel(props) {
           ) : (
             <>
               {view === 'summary' && (
-                <>
-                  <div className="metric-grid audit-metrics">
-                    <Metric
-                      label="Importe informado por SIAGRI"
-                      value={amount(audit.summary.total)}
-                      note={`${audit.summary.lines.toLocaleString('es-NI')} líneas originales · ver desglose`}
-                      onClick={() => openGroup(audit.rows, 'Prefactura completa')}
-                    />
-                    <Metric
-                      label="Extremos prioritarios"
-                      value={audit.summary.priority}
-                      note="Valores desproporcionados · no valorizados"
-                      tone="warning"
-                      onClick={() => showCategory('EXTREME')}
-                    />
-                    <Metric
-                      label="Atípicas estadísticas"
-                      value={audit.summary.statistical}
-                      note="Líneas únicas · tarifas reportadas o efectivas"
-                      onClick={() => showCategory('statistical')}
-                    />
-                    <Metric
-                      label="Presentación SIAGRI"
-                      value={audit.summary.presentation}
-                      note="La multiplicación no reproduce el importe"
-                      onClick={() => showCategory('PRESENTATION')}
-                    />
-                    <Metric
-                      label="Repeticiones documentales"
-                      value={audit.summary.repeated}
-                      note="Líneas únicas · sin confirmar cobro duplicado"
-                      onClick={() => showCategory('repeated')}
-                    />
-                    <Metric
-                      label="Sin referencia suficiente"
-                      value={audit.summary.insufficient}
-                      note="Muestra o dimensiones insuficientes"
-                      onClick={() => showCategory('insufficient')}
-                    />
-                  </div>
-                  <div className="audit-summary-grid">
-                    <Panel
-                      title="Prioridad de revisión"
-                      subtitle="Extremos relativos a su propia población. Abra una línea para consultar la evidencia."
-                    >
-                      <LineTable
-                        compact
-                        rows={filterAuditRows(audit.rows, { category: 'EXTREME' }).sort((a, b) => {
-                          const distance = (row) =>
-                            Math.max(
-                              ...row.observations
-                                .filter((item) => item.ratio > 0)
-                                .map((item) => Math.max(item.ratio, 1 / item.ratio)),
-                            );
-                          return distance(b) - distance(a);
-                        })}
-                        onOpen={openLine}
-                      />
-                      <button className="button secondary" onClick={() => showCategory('observed')}>
-                        Ver todos los indicadores ({audit.summary.observed})
-                      </button>
-                    </Panel>
-                    <Panel
-                      title="Cómo interpretar los resultados"
-                      subtitle="La referencia estadística no es una tarifa autorizada."
-                    >
-                      <p>
-                        Una tarifa mostrada puede ser un promedio aritmético. La efectiva es Total / Unidades positivas; puede
-                        representar una mezcla de jornadas. Ninguna de las dos certifica el cobro.
-                      </p>
-                      <p>
-                        Los cambios antes y después de mayo de 2026 son descriptivos. No se exige automáticamente un incremento
-                        del 4,6 %.
-                      </p>
-                      <p>
-                        Las repeticiones suman {amount(audit.summary.repeatedAmount)} en líneas originales distintas. Es importe
-                        registrado para investigar, no una diferencia exigible.
-                      </p>
-                      <button className="button secondary" onClick={() => setView('rates')}>
-                        Explorar evolución de tarifas
-                      </button>
-                    </Panel>
-                  </div>
-                </>
+                <AuditWorkQueue
+                  audit={audit}
+                  onOpenLine={openLine}
+                  onShowCategory={showCategory}
+                  onOpenGroup={openGroup}
+                  onViewRates={() => setView('rates')}
+                />
               )}
               {view === 'rates' && (
                 <Panel
@@ -575,6 +499,16 @@ function AuditDetail({ stack, setStack, audit, source }) {
             Tarifa autorizada no disponible / importe esperado no verificable. Una señal estadística o de presentación no confirma
             un error económico.
           </p>
+          <div className="audit-case-guidance">
+            <h3>Qué encontramos</h3>
+            <strong>{caseType(row)}</strong>
+            <p>{caseExplanation(row, population)}</p>
+            <h3>Qué debes revisar</h3>
+            <p>{caseNextStep(row)}</p>
+            <p className="audit-case-support">
+              La comparación es descriptiva. Tarifa oficial y diferencia económica: todavía no verificables.
+            </p>
+          </div>
           <LineFields row={row}>
             <Field label="Tarifa reportada · precisión original">{String(row.tariff ?? 'No disponible')}</Field>
             <Field label="Tarifa efectiva · Total / Unidades">{number(row.effective)}</Field>
