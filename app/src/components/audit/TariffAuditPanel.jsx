@@ -210,8 +210,8 @@ export function TariffAuditPanel(props) {
                         </div>
                       </div>
                       <p className="audit-history-help">
-                        Mira cómo cambió la tarifa típica observada por mes, para el mismo servicio, unidad y contratista.
-                        No es una tarifa aprobada. Toca un mes para ver las muestras, sus límites y el origen.
+                        Mira cómo cambió la tarifa típica observada por mes, para el mismo servicio, unidad y contratista. No es
+                        una tarifa aprobada. Toca un mes para ver las muestras, sus límites y el origen.
                       </p>
                       <div className="audit-history-table">
                         <DataTable

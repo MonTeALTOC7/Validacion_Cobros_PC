@@ -35,15 +35,13 @@ export function caseExplanation(row, population) {
     return 'La tarifa mostrada o efectiva está fuera del rango observado en registros comparables. No constituye un error confirmado.';
   if (type === 'Tarifa o importe cero/negativo')
     return 'El origen podría contener un ajuste, crédito, omisión o valor válido; debe verificarse el documento.';
-  if (type === 'Información por verificar')
-    return 'Faltan datos suficientes para interpretar correctamente el registro.';
+  if (type === 'Información por verificar') return 'Faltan datos suficientes para interpretar correctamente el registro.';
   return 'No se detectó una señal automática; esto no certifica que la tarifa fuera la autorizada.';
 }
 
 export function caseNextStep(row) {
   const type = caseType(row);
-  if (type === 'Posible repetición')
-    return 'Comprobar la ejecución, la P.FACT definitiva y si hubo anulación o reemisión.';
+  if (type === 'Posible repetición') return 'Comprobar la ejecución, la P.FACT definitiva y si hubo anulación o reemisión.';
   if (type === 'Tarifa presentada no reproduce importe')
     return 'Revisar el desglose del cobro en SIAGRI; no recalcular ni sustituir el importe original.';
   if (type === 'Información por verificar' || type === 'Tarifa o importe cero/negativo')
@@ -82,7 +80,9 @@ function CaseCard({ row, population, onOpen }) {
       </div>
       <p>{caseExplanation(row, population)}</p>
       <div className="audit-case-footer">
-        <small>Importe Prefactura: {money(row.total)} · P.FACT {row.pFact || 'No informada'}</small>
+        <small>
+          Importe Prefactura: {money(row.total)} · P.FACT {row.pFact || 'No informada'}
+        </small>
         <button type="button" className="button secondary" onClick={() => onOpen(row)}>
           Ver cobro y evidencia
         </button>
@@ -113,8 +113,8 @@ export function AuditWorkQueue({ audit, onOpenLine, onShowCategory, onOpenGroup,
           <span className="audit-eyebrow">CONTROL DE TARIFAS · PREFACTURA</span>
           <h2>¿Qué cobros tenemos que revisar?</h2>
           <p>
-            Empezamos por las tarifas más llamativas. Cada caso indica de dónde salió, con qué se comparó y qué debemos
-            comprobar. Una alerta no significa que exista un cobro incorrecto.
+            Empezamos por las tarifas más llamativas. Cada caso indica de dónde salió, con qué se comparó y qué debemos comprobar.
+            Una alerta no significa que exista un cobro incorrecto.
           </p>
         </div>
         <button type="button" className="button secondary" onClick={onViewRates}>
@@ -199,12 +199,7 @@ export function AuditWorkQueue({ audit, onOpenLine, onShowCategory, onOpenGroup,
         </div>
         <div className="audit-queue-cards">
           {urgent.slice(0, 8).map((row) => (
-            <CaseCard
-              key={row.auditId}
-              row={row}
-              population={populations.get(row.populationKey)}
-              onOpen={onOpenLine}
-            />
+            <CaseCard key={row.auditId} row={row} population={populations.get(row.populationKey)} onOpen={onOpenLine} />
           ))}
         </div>
         <div className="audit-queue-footer">
@@ -215,11 +210,7 @@ export function AuditWorkQueue({ audit, onOpenLine, onShowCategory, onOpenGroup,
         </div>
       </Panel>
       <div className="audit-operational-bottom">
-        <button
-          type="button"
-          className="audit-bottom-action"
-          onClick={() => onOpenGroup(audit.rows, 'Prefactura completa')}
-        >
+        <button type="button" className="audit-bottom-action" onClick={() => onOpenGroup(audit.rows, 'Prefactura completa')}>
           <span>Importe informado por SIAGRI</span>
           <strong>{money(audit.summary.total)}</strong>
           <small>{audit.summary.lines.toLocaleString('es-NI')} registros originales · ver desglose</small>
@@ -231,8 +222,8 @@ export function AuditWorkQueue({ audit, onOpenLine, onShowCategory, onOpenGroup,
         </button>
       </div>
       <p className="audit-legal-note">
-        El valor de una tarifa observada no es una tarifa aprobada. Sin el tarifario CASUR no se puede calcular cuánto
-        debió cobrarse ni declarar una diferencia económica confirmada.
+        El valor de una tarifa observada no es una tarifa aprobada. Sin el tarifario CASUR no se puede calcular cuánto debió
+        cobrarse ni declarar una diferencia económica confirmada.
       </p>
     </div>
   );
