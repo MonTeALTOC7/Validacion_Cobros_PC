@@ -8,6 +8,7 @@ import { analyzeTariffs, AUDIT_DEFAULTS, AUDIT_RULES, filterAuditRows } from '..
 import { FINANCE_UNIVERSES } from '../../engine/finance';
 import { formatCurrency, formatNumber } from '../../lib/format';
 import './tariff-audit.css';
+import { CaseExplanation, OperationalEvolution, OperationalQueue } from './OperationalAudit';
 
 const number = (value) => (value == null || !Number.isFinite(value) ? 'No disponible' : formatNumber(value, 4));
 const amount = (value) => (value == null || !Number.isFinite(value) ? 'No disponible' : formatCurrency(value));
@@ -27,9 +28,9 @@ const categories = {
 };
 const DEFAULT_FILTERS = { search: '', category: 'observed', service: '', unit: '', contractorCode: '', universe: '', month: '' };
 const VIEWS = {
-  summary: 'Resumen ejecutivo',
-  rates: 'Tarifas por período',
-  discrepancies: 'Discrepancias',
+  summary: 'Pendientes de revisión',
+  rates: 'Evolución de tarifas',
+  discrepancies: 'Todos los registros',
   history: 'Historial y cierres',
 };
 
@@ -112,7 +113,10 @@ export function TariffAuditPanel(props) {
             key={key}
             aria-current={view === key ? 'page' : undefined}
             aria-pressed={view === key}
-            onClick={() => setView(key)}
+            onClick={() => {
+              if (key === 'discrepancies') setFilters({ ...DEFAULT_FILTERS, category: 'all' });
+              setView(key);
+            }}
           >
             {label}
           </button>
@@ -125,7 +129,7 @@ export function TariffAuditPanel(props) {
           <section className="audit-scope" aria-label="Alcance de la auditoría">
             <div>
               <span className="audit-eyebrow">PREFACTURA SIAGRI · ANÁLISIS EXPLORATORIO</span>
-              <h2>Indicadores para revisar</h2>
+              <h2>{view === 'summary' ? 'Cobros que requieren revisión' : VIEWS[view]}</h2>
               <p>Tarifa autorizada no disponible / importe esperado no verificable.</p>
             </div>
             <div className="audit-coverage">
@@ -143,93 +147,58 @@ export function TariffAuditPanel(props) {
             <>
               {view === 'summary' && (
                 <>
-                  <div className="metric-grid audit-metrics">
-                    <Metric
-                      label="Importe informado por SIAGRI"
-                      value={amount(audit.summary.total)}
-                      note={`${audit.summary.lines.toLocaleString('es-NI')} líneas originales · ver desglose`}
-                      onClick={() => openGroup(audit.rows, 'Prefactura completa')}
-                    />
-                    <Metric
-                      label="Extremos prioritarios"
-                      value={audit.summary.priority}
-                      note="Valores desproporcionados · no valorizados"
-                      tone="warning"
-                      onClick={() => showCategory('EXTREME')}
-                    />
-                    <Metric
-                      label="Atípicas estadísticas"
-                      value={audit.summary.statistical}
-                      note="Líneas únicas · tarifas reportadas o efectivas"
-                      onClick={() => showCategory('statistical')}
-                    />
-                    <Metric
-                      label="Presentación SIAGRI"
-                      value={audit.summary.presentation}
-                      note="La multiplicación no reproduce el importe"
-                      onClick={() => showCategory('PRESENTATION')}
-                    />
-                    <Metric
-                      label="Repeticiones documentales"
-                      value={audit.summary.repeated}
-                      note="Líneas únicas · sin confirmar cobro duplicado"
-                      onClick={() => showCategory('repeated')}
-                    />
-                    <Metric
-                      label="Sin referencia suficiente"
-                      value={audit.summary.insufficient}
-                      note="Muestra o dimensiones insuficientes"
-                      onClick={() => showCategory('insufficient')}
-                    />
-                  </div>
-                  <div className="audit-summary-grid">
-                    <Panel
-                      title="Prioridad de revisión"
-                      subtitle="Extremos relativos a su propia población. Abra una línea para consultar la evidencia."
-                    >
-                      <LineTable
-                        compact
-                        rows={filterAuditRows(audit.rows, { category: 'EXTREME' }).sort((a, b) => {
-                          const distance = (row) =>
-                            Math.max(
-                              ...row.observations
-                                .filter((item) => item.ratio > 0)
-                                .map((item) => Math.max(item.ratio, 1 / item.ratio)),
-                            );
-                          return distance(b) - distance(a);
-                        })}
-                        onOpen={openLine}
+                  <OperationalQueue
+                    audit={audit}
+                    onOpen={openLine}
+                    onTotal={() => openGroup(audit.rows, 'Prefactura completa')}
+                  />
+                  <details className="panel audit-technical-summary">
+                    <summary>Indicadores técnicos y desglose del importe</summary>
+                    <div className="metric-grid audit-metrics">
+                      <Metric
+                        label="Importe informado por SIAGRI"
+                        value={amount(audit.summary.total)}
+                        note={`${audit.summary.lines.toLocaleString('es-NI')} líneas originales · ver desglose`}
+                        onClick={() => openGroup(audit.rows, 'Prefactura completa')}
                       />
-                      <button className="button secondary" onClick={() => showCategory('observed')}>
-                        Ver todos los indicadores ({audit.summary.observed})
-                      </button>
-                    </Panel>
-                    <Panel
-                      title="Cómo interpretar los resultados"
-                      subtitle="La referencia estadística no es una tarifa autorizada."
-                    >
-                      <p>
-                        Una tarifa mostrada puede ser un promedio aritmético. La efectiva es Total / Unidades positivas; puede
-                        representar una mezcla de jornadas. Ninguna de las dos certifica el cobro.
-                      </p>
-                      <p>
-                        Los cambios antes y después de mayo de 2026 son descriptivos. No se exige automáticamente un incremento
-                        del 4,6 %.
-                      </p>
-                      <p>
-                        Las repeticiones suman {amount(audit.summary.repeatedAmount)} en líneas originales distintas. Es importe
-                        registrado para investigar, no una diferencia exigible.
-                      </p>
-                      <button className="button secondary" onClick={() => setView('rates')}>
-                        Explorar evolución de tarifas
-                      </button>
-                    </Panel>
-                  </div>
+                      <Metric
+                        label="Extremos prioritarios"
+                        value={audit.summary.priority}
+                        note="Valores desproporcionados · no valorizados"
+                        tone="warning"
+                        onClick={() => showCategory('EXTREME')}
+                      />
+                      <Metric
+                        label="Atípicas estadísticas"
+                        value={audit.summary.statistical}
+                        note="Líneas únicas · tarifas reportadas o efectivas"
+                        onClick={() => showCategory('statistical')}
+                      />
+                      <Metric
+                        label="Presentación SIAGRI"
+                        value={audit.summary.presentation}
+                        note="La multiplicación no reproduce el importe"
+                        onClick={() => showCategory('PRESENTATION')}
+                      />
+                      <Metric
+                        label="Repeticiones documentales"
+                        value={audit.summary.repeated}
+                        note="Líneas únicas · sin confirmar cobro duplicado"
+                        onClick={() => showCategory('repeated')}
+                      />
+                      <Metric
+                        label="Sin referencia suficiente"
+                        value={audit.summary.insufficient}
+                        note="Muestra o dimensiones insuficientes"
+                        onClick={() => showCategory('insufficient')}
+                      />
+                    </div>
+                  </details>
                 </>
               )}
               {view === 'rates' && (
                 <Panel
-                  title="Tarifas y vigencias observadas"
+                  title="Evolución de tarifas observadas"
                   subtitle="Mes calendario de la fecha de Prefactura; no representa una vigencia contractual ni necesariamente el día de ejecución."
                 >
                   <label className="audit-series">
@@ -250,98 +219,102 @@ export function TariffAuditPanel(props) {
                         originales permanecen completos. Jornada/base no informada implica una comparación exploratoria,
                         potencialmente mixta.
                       </p>
-                      <div className="audit-comparison">
-                        {[
-                          ['before', `Antes de ${config.cutoff}`],
-                          ['after', `Desde ${config.cutoff}`],
-                        ].map(([key, label]) => (
-                          <button
-                            key={key}
-                            className="audit-period-card"
-                            onClick={() =>
-                              openGroup(
-                                audit.rows.filter((row) => series[key].rowIds.includes(row.auditId)),
-                                label,
-                              )
-                            }
-                            disabled={!series[key].rows}
-                          >
-                            <span>{label}</span>
-                            <strong>{number(series[key].effectiveMedian)}</strong>
-                            <small>Mediana efectiva · {number(series[key].reportedMedian)} reportada</small>
+                      <OperationalEvolution series={series} periods={periods} audit={audit} onOpen={openGroup} />
+                      <details className="audit-history-technical">
+                        <summary>Detalle técnico: medianas, MAD e intervalos</summary>
+                        <div className="audit-comparison">
+                          {[
+                            ['before', `Antes de ${config.cutoff}`],
+                            ['after', `Desde ${config.cutoff}`],
+                          ].map(([key, label]) => (
+                            <button
+                              key={key}
+                              className="audit-period-card"
+                              onClick={() =>
+                                openGroup(
+                                  audit.rows.filter((row) => series[key].rowIds.includes(row.auditId)),
+                                  label,
+                                )
+                              }
+                              disabled={!series[key].rows}
+                            >
+                              <span>{label}</span>
+                              <strong>{number(series[key].effectiveMedian)}</strong>
+                              <small>Mediana efectiva · {number(series[key].reportedMedian)} reportada</small>
+                              <small>
+                                {range(series[key])} · {series[key].samples} muestras positivas
+                              </small>
+                            </button>
+                          ))}
+                          <div className="audit-period-card">
+                            <span>Cambio observado de medianas</span>
+                            <strong>{percent(series.effectiveChange)}</strong>
+                            <small>Efectiva · reportada {percent(series.reportedChange)}</small>
                             <small>
-                              {range(series[key])} · {series[key].samples} muestras positivas
+                              {series.sufficient
+                                ? 'Muestras suficientes; composición/jornada por verificar'
+                                : 'Muestra limitada o falta uno de los períodos'}
                             </small>
-                          </button>
-                        ))}
-                        <div className="audit-period-card">
-                          <span>Cambio observado de medianas</span>
-                          <strong>{percent(series.effectiveChange)}</strong>
-                          <small>Efectiva · reportada {percent(series.reportedChange)}</small>
-                          <small>
-                            {series.sufficient
-                              ? 'Muestras suficientes; composición/jornada por verificar'
-                              : 'Muestra limitada o falta uno de los períodos'}
-                          </small>
+                          </div>
                         </div>
-                      </div>
-                      <DataTable
-                        key={series.key}
-                        rows={periods}
-                        onRowClick={(group) =>
-                          openGroup(
-                            audit.rows.filter((row) => row.populationKey === group.key),
-                            `Comparables · ${group.service} · ${group.month}`,
-                          )
-                        }
-                        columns={[
-                          { key: 'month', label: 'Mes observado' },
-                          { key: 'rows', label: 'Líneas originales', num: true },
-                          {
-                            key: 'n',
-                            label: 'Muestras efectivas',
-                            num: true,
-                            value: (group) => group.effective.n,
-                            render: (group) => group.effective.n,
-                          },
-                          {
-                            key: 'reported',
-                            label: 'Mediana reportada',
-                            num: true,
-                            value: (group) => group.reported.median,
-                            render: (group) => number(group.reported.median),
-                          },
-                          {
-                            key: 'effective',
-                            label: 'Mediana efectiva',
-                            num: true,
-                            value: (group) => group.effective.median,
-                            render: (group) => number(group.effective.median),
-                          },
-                          {
-                            key: 'mad',
-                            label: 'MAD efectiva',
-                            num: true,
-                            value: (group) => group.effective.mad,
-                            render: (group) => number(group.effective.mad),
-                          },
-                          {
-                            key: 'reference',
-                            label: 'Referencia',
-                            render: (group) =>
-                              group.effective.sufficient
-                                ? `${number(group.effective.lower)} → ${number(group.effective.upper)} · exploratoria`
-                                : group.effective.reason,
-                          },
-                        ]}
-                      />
+                        <DataTable
+                          key={series.key}
+                          rows={periods}
+                          onRowClick={(group) =>
+                            openGroup(
+                              audit.rows.filter((row) => row.populationKey === group.key),
+                              `Comparables · ${group.service} · ${group.month}`,
+                            )
+                          }
+                          columns={[
+                            { key: 'month', label: 'Mes observado' },
+                            { key: 'rows', label: 'Líneas originales', num: true },
+                            {
+                              key: 'n',
+                              label: 'Muestras efectivas',
+                              num: true,
+                              value: (group) => group.effective.n,
+                              render: (group) => group.effective.n,
+                            },
+                            {
+                              key: 'reported',
+                              label: 'Mediana reportada',
+                              num: true,
+                              value: (group) => group.reported.median,
+                              render: (group) => number(group.reported.median),
+                            },
+                            {
+                              key: 'effective',
+                              label: 'Mediana efectiva',
+                              num: true,
+                              value: (group) => group.effective.median,
+                              render: (group) => number(group.effective.median),
+                            },
+                            {
+                              key: 'mad',
+                              label: 'MAD efectiva',
+                              num: true,
+                              value: (group) => group.effective.mad,
+                              render: (group) => number(group.effective.mad),
+                            },
+                            {
+                              key: 'reference',
+                              label: 'Referencia',
+                              render: (group) =>
+                                group.effective.sufficient
+                                  ? `${number(group.effective.lower)} → ${number(group.effective.upper)} · exploratoria`
+                                  : group.effective.reason,
+                            },
+                          ]}
+                        />
+                      </details>
                     </>
                   )}
                 </Panel>
               )}
               {view === 'discrepancies' && (
                 <Panel
-                  title="Discrepancias e indicadores"
+                  title="Todos los registros · búsqueda y desglose"
                   subtitle="Una fila por registro original, aunque active varias señales. La búsqueda no recalibra la referencia."
                 >
                   <div className="audit-filters">
@@ -575,6 +548,7 @@ function AuditDetail({ stack, setStack, audit, source }) {
             Tarifa autorizada no disponible / importe esperado no verificable. Una señal estadística o de presentación no confirma
             un error económico.
           </p>
+          <CaseExplanation row={row} population={population} />
           <LineFields row={row}>
             <Field label="Tarifa reportada · precisión original">{String(row.tariff ?? 'No disponible')}</Field>
             <Field label="Tarifa efectiva · Total / Unidades">{number(row.effective)}</Field>
@@ -586,66 +560,69 @@ function AuditDetail({ stack, setStack, audit, source }) {
             </Field>
             <Field label="SHA-256 del archivo">{source?.hash ?? 'No disponible'}</Field>
           </LineFields>
-          <h3>Señales independientes</h3>
-          {row.observations.length ? (
-            <ul className="audit-observations">
-              {row.observations.map((item) => (
-                <li key={item.key}>
-                  <strong>{AUDIT_RULES[item.rule]}</strong>
-                  <p>{item.explanation}</p>
-                  {item.ratio != null && (
-                    <small>
-                      Razón frente a mediana: {number(item.ratio)} · {item.metric === 'tariff' ? 'reportada' : 'efectiva'}
-                    </small>
-                  )}
-                  {item.repetitionKey && (
-                    <button
-                      className="link-button"
-                      onClick={() => {
-                        const group = audit.repetitions.find((entry) => entry.key === item.repetitionKey);
-                        openRows(group.rows, AUDIT_RULES[item.rule]);
-                      }}
-                    >
-                      Ver registros coincidentes
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No se detectaron señales con esta configuración. Esto no certifica la tarifa.</p>
-          )}
-          <h3>Referencia estadística · {population.month}</h3>
-          <p>
-            {row.service} · {row.labor} · {row.unit} · {row.contractorCode} · {FINANCE_UNIVERSES[row.universe]} · {row.jornada} ·{' '}
-            {row.billingBase}. {population.excludedCopies} copias excluidas.{' '}
-            {population.exploratory && 'Jornada/base desconocida: puede haber mezcla no identificada.'}
-          </p>
-          {['reported', 'effective'].map((metric) => {
-            const ref = population[metric];
-            return (
-              <div className="audit-reference" key={metric}>
-                <strong>{metric === 'reported' ? 'Tarifa reportada' : 'Tarifa efectiva'}</strong>
-                <p>
-                  {ref.n} muestras · {ref.weeks} semanas · mediana {number(ref.median)} · MAD {number(ref.mad)}
-                </p>
-                <p>{ref.sufficient ? `Intervalo ${number(ref.lower)} → ${number(ref.upper)} · ${ref.method}` : ref.reason}</p>
-                <button
-                  className="button secondary"
-                  disabled={!ref.rowIds.length}
-                  onClick={() => {
-                    const ids = new Set(ref.rowIds);
-                    openRows(
-                      audit.rows.filter((entry) => ids.has(entry.auditId)),
-                      `Muestra ${metric === 'reported' ? 'reportada' : 'efectiva'} · ${population.month}`,
-                    );
-                  }}
-                >
-                  Ver muestra comparable
-                </button>
-              </div>
-            );
-          })}
+          <details className="audit-evidence-technical">
+            <summary>Detalle técnico y muestras comparables</summary>
+            <h3>Señales independientes</h3>
+            {row.observations.length ? (
+              <ul className="audit-observations">
+                {row.observations.map((item) => (
+                  <li key={item.key}>
+                    <strong>{AUDIT_RULES[item.rule]}</strong>
+                    <p>{item.explanation}</p>
+                    {item.ratio != null && (
+                      <small>
+                        Razón frente a mediana: {number(item.ratio)} · {item.metric === 'tariff' ? 'reportada' : 'efectiva'}
+                      </small>
+                    )}
+                    {item.repetitionKey && (
+                      <button
+                        className="link-button"
+                        onClick={() => {
+                          const group = audit.repetitions.find((entry) => entry.key === item.repetitionKey);
+                          openRows(group.rows, AUDIT_RULES[item.rule]);
+                        }}
+                      >
+                        Ver registros coincidentes
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No se detectaron señales con esta configuración. Esto no certifica la tarifa.</p>
+            )}
+            <h3>Referencia estadística · {population.month}</h3>
+            <p>
+              {row.service} · {row.labor} · {row.unit} · {row.contractorCode} · {FINANCE_UNIVERSES[row.universe]} · {row.jornada}{' '}
+              · {row.billingBase}. {population.excludedCopies} copias excluidas.{' '}
+              {population.exploratory && 'Jornada/base desconocida: puede haber mezcla no identificada.'}
+            </p>
+            {['reported', 'effective'].map((metric) => {
+              const ref = population[metric];
+              return (
+                <div className="audit-reference" key={metric}>
+                  <strong>{metric === 'reported' ? 'Tarifa reportada' : 'Tarifa efectiva'}</strong>
+                  <p>
+                    {ref.n} muestras · {ref.weeks} semanas · mediana {number(ref.median)} · MAD {number(ref.mad)}
+                  </p>
+                  <p>{ref.sufficient ? `Intervalo ${number(ref.lower)} → ${number(ref.upper)} · ${ref.method}` : ref.reason}</p>
+                  <button
+                    className="button secondary"
+                    disabled={!ref.rowIds.length}
+                    onClick={() => {
+                      const ids = new Set(ref.rowIds);
+                      openRows(
+                        audit.rows.filter((entry) => ids.has(entry.auditId)),
+                        `Muestra ${metric === 'reported' ? 'reportada' : 'efectiva'} · ${population.month}`,
+                      );
+                    }}
+                  >
+                    Ver muestra comparable
+                  </button>
+                </div>
+              );
+            })}
+          </details>
         </div>
       )}
     </DrillDrawer>
