@@ -1,0 +1,39 @@
+# Temporal: QA visual del rediseño, únicamente PR auditoría.
+name: Auditoría - capturas para QA
+
+on:
+  push:
+    branches:
+      - feature/auditoria-tarifas-cobros
+
+permissions:
+  contents: read
+
+jobs:
+  capturas:
+    if: github.ref == 'refs/heads/feature/auditoria-tarifas-cobros'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Dependencias
+        run: npm ci
+      - name: Navegador
+        run: npx playwright-core install --with-deps chromium
+      - name: Evidencia funcional PC y móvil
+        run: node tests/e2e/tariff-audit.mjs --site .. --shots auditoria-capturas
+      - name: Capturas para inspección
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: auditoria-qa-operativa
+          path: app/auditoria-capturas/*.png
+          if-no-files-found: warn
