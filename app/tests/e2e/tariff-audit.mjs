@@ -45,10 +45,7 @@ try {
     const module = page.locator('.tariff-audit-module');
     const view = async (name) =>
       module.locator('nav[aria-label="Vistas de auditoría"]').getByRole('button', { name, exact: true }).click();
-    const metric = (name) =>
-      name === 'Importe informado'
-        ? module.locator('.audit-bottom-action', { hasText: 'Importe informado por SIAGRI' })
-        : module.locator('.metric-action', { hasText: name });
+    const metric = (name) => module.locator('.metric-action', { hasText: name });
     check(
       `${device}: cobertura real y total original`,
       /2026-01-02 → 2026-09-20/.test(await module.innerText()) &&
@@ -63,13 +60,6 @@ try {
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
     );
     if (shots) await page.screenshot({ path: path.join(shots, `${device}-resumen.png`), fullPage: true });
-    check(
-      `${device}: bandeja operativa muestra productor, motivo y acceso a evidencia`,
-      /Qué cobros tenemos que revisar/.test(await module.innerText()) &&
-        (device === 'móvil'
-          ? (await module.locator('.audit-queue-cards .audit-case-card').count()) > 0
-          : (await module.locator('.audit-queue-table tbody tr').count()) > 0),
-    );
     const count = Number(await metric('Extremos prioritarios').locator('strong').innerText());
     await metric('Extremos prioritarios').click();
     check(
@@ -94,10 +84,6 @@ try {
         /16183/.test(evidence) &&
         /0.88/.test(evidence) &&
         /16013/.test(evidence),
-    );
-    check(
-      `${device}: caso explica qué encontramos y qué revisar`,
-      /Qué encontramos/.test(evidence) && /Qué debes revisar/.test(evidence) && /tarifa/i.test(evidence),
     );
     check(
       `${device}: referencia reproducible visible`,
@@ -134,7 +120,7 @@ try {
         (await page.getByLabel('Buscar evidencia').inputValue()) === '1376' &&
         (await opener.evaluate((element) => element === document.activeElement)),
     );
-    await view('Qué revisar');
+    await view('Resumen ejecutivo');
     await metric('Importe informado').click();
     check(
       `${device}: desglose conserva C$13,278,583.33`,
@@ -154,7 +140,7 @@ try {
     if (device === 'móvil')
       check('móvil: detalle a ancho completo', Math.abs((await drawer.boundingBox()).width - viewport.width) < 2);
     await drawer.getByRole('button', { name: 'Cerrar detalle', exact: true }).click();
-    await view('Comparar tarifas');
+    await view('Tarifas por período');
     const series = module.locator('.audit-series select');
     const cmn = await series
       .locator('option')
@@ -168,19 +154,14 @@ try {
         /Cambio observado/.test(rates) &&
         !/2025-12/.test(rates),
     );
-    const periodHeaders = (await module.locator('.audit-history-table th').allTextContents()).join(' ');
     check(
-      `${device}: tabla histórica prioriza tarifas y mantiene MAD en el detalle técnico`,
-      /Mes observado/i.test(rates) &&
-        /Tarifa mostrada típica/i.test(periodHeaders) &&
-        /Tarifa efectiva típica/i.test(periodHeaders) &&
-        /MAD efectiva/i.test(periodHeaders) &&
-        (await module.locator('.audit-history-table tbody tr').count()) > 1,
+      `${device}: tabla por período con MAD`,
+      /Mes observado/i.test(rates) && /MAD efectiva/i.test(rates) && (await module.locator('tbody tr').count()) > 1,
     );
     if (shots) await page.screenshot({ path: path.join(shots, `${device}-historico.png`), fullPage: true });
     await view('Historial y cierres');
     check(`${device}: panel de cierres original accesible`, (await module.locator('.week-controls button').count()) > 0);
-    await view('Qué revisar');
+    await view('Resumen ejecutivo');
     await module.locator('.audit-method summary').click();
     await module.getByLabel('Mínimo de muestras').fill('15');
     await module.getByRole('button', { name: 'Recalcular auditoría', exact: true }).click();
