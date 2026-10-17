@@ -21,15 +21,34 @@ const row = (fields = {}) => ({
   ...fields,
 });
 describe('presentación operativa sin cambios al motor', () => {
+  it('separa origen incompleto y comparables insuficientes, incluso cuando coexisten', () => {
+    expect(reviewReasons(row({ observations: [{ rule: 'INPUT' }] }))).toEqual(['Datos de origen incompletos']);
+    const incomplete = row({ observations: [{ rule: 'INPUT' }], referenceSufficient: false });
+    expect(reviewReasons(incomplete)).toEqual(['Datos de origen incompletos', 'Comparables insuficientes']);
+    expect(reviewRows([incomplete])).toHaveLength(1);
+    expect(caseGuidance(row({ referenceSufficient: false })).why).toContain(
+      'no implica por sí solo que el registro original esté incompleto',
+    );
+  });
+  it('tarifas diferentes no se presentan como repetición documental', () => {
+    const different = row({ observations: [{ rule: 'DIFFERENT_RATE' }] });
+    expect(reviewReasons(different)).toEqual(['Igual cantidad con tarifas diferentes']);
+    expect(caseGuidance(different).why).toContain('no constituye por sí sola evidencia de cobro duplicado');
+    expect(caseGuidance(different).actions.join(' ')).toContain('Contrastar jornadas');
+    expect(reviewReasons(row({ observations: [{ rule: 'EXACT_REPEAT' }, { rule: 'DIFFERENT_RATE' }] }))).toEqual([
+      'Posible repetición documental',
+      'Igual cantidad con tarifas diferentes',
+    ]);
+  });
   it('conserva varios motivos y deduplica por identidad, no por dinero', () => {
     const a = row({ observations: [{ rule: 'EXTREME' }, { rule: 'EFFECTIVE_OUTLIER' }, { rule: 'CROSS_INVOICE' }] });
     const b = row({ auditId: 'b', referenceSufficient: false });
-    expect(reviewReasons(a)).toEqual(['Tarifa inusual', 'Posible repetición']);
+    expect(reviewReasons(a)).toEqual(['Tarifa inusual', 'Posible repetición documental']);
     expect(reviewRows([b, a, a]).map((item) => item.auditId)).toEqual(['a', 'b']);
     expect(reviewRows([b, a, a]).reduce((sum, item) => sum + item.total, 0)).toBe(800);
   });
   it('no confunde ausencia de señal con referencia suficiente', () => {
-    expect(reviewReasons(row({ referenceSufficient: false }))).toEqual(['Falta información']);
+    expect(reviewReasons(row({ referenceSufficient: false }))).toEqual(['Comparables insuficientes']);
     expect(reviewRows([row()])).toEqual([]);
   });
   it('no muestra medianas insuficientes o no finitas como referencia válida', () => {

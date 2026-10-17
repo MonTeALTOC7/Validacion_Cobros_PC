@@ -568,7 +568,11 @@ function AuditDetail({ stack, setStack, audit, source }) {
                 {row.observations.map((item) => (
                   <li key={item.key}>
                     <strong>{AUDIT_RULES[item.rule]}</strong>
-                    <p>{item.explanation}</p>
+                    <p>
+                      {item.rule === 'DIFFERENT_RATE'
+                        ? 'Igual cantidad con tarifas diferentes: verificar jornadas, condiciones y desglose. Una tarifa distinta no constituye por sí sola evidencia de cobro duplicado.'
+                        : item.explanation}
+                    </p>
                     {item.ratio != null && (
                       <small>
                         Razón frente a mediana: {number(item.ratio)} · {item.metric === 'tariff' ? 'reportada' : 'efectiva'}

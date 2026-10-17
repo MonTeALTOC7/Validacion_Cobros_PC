@@ -4,8 +4,10 @@ export const reviewReasons = (row) => {
   return [
     [['EXTREME', 'REPORTED_OUTLIER', 'EFFECTIVE_OUTLIER', 'NON_POSITIVE'].some((rule) => rules.has(rule)), 'Tarifa inusual'],
     [rules.has('PRESENTATION'), 'Diferencia de presentación SIAGRI'],
-    [['EXACT_REPEAT', 'CROSS_INVOICE', 'DIFFERENT_RATE'].some((rule) => rules.has(rule)), 'Posible repetición'],
-    [rules.has('INPUT') || !row.referenceSufficient, 'Falta información'],
+    [['EXACT_REPEAT', 'CROSS_INVOICE'].some((rule) => rules.has(rule)), 'Posible repetición documental'],
+    [rules.has('DIFFERENT_RATE'), 'Igual cantidad con tarifas diferentes'],
+    [rules.has('INPUT'), 'Datos de origen incompletos'],
+    [!row.referenceSufficient, 'Comparables insuficientes'],
   ]
     .filter(([active]) => active)
     .map(([, label]) => label);
@@ -45,11 +47,22 @@ export function caseGuidance(row, population) {
     comparisons.push(
       'Tarifa × unidades no reproduce el total; puede ser un promedio SIAGRI. Esto no demuestra su causa ni valida el cobro.',
     );
-  if (reasons.includes('Posible repetición')) comparisons.push('Hay coincidencias documentales; no confirman un doble cobro.');
+  if (reasons.includes('Posible repetición documental'))
+    comparisons.push('Hay coincidencias documentales; no confirman un doble cobro.');
+  if (reasons.includes('Igual cantidad con tarifas diferentes'))
+    comparisons.push(
+      'Coinciden cantidades con tarifas distintas; pueden corresponder a condiciones o jornadas diferentes. La tarifa distinta no constituye por sí sola evidencia de cobro duplicado.',
+    );
   if (row.observations.some((item) => item.rule === 'NON_POSITIVE'))
     comparisons.push('Hay un cero o negativo: podría ser ajuste, crédito o dato ausente normalizado.');
-  if (reasons.includes('Falta información'))
-    comparisons.push('Faltan datos o una muestra comparable suficiente; no es posible certificar la tarifa.');
+  if (reasons.includes('Datos de origen incompletos'))
+    comparisons.push(
+      'El motor detectó datos de origen faltantes o inválidos. Verificar los campos señalados en el documento original.',
+    );
+  if (reasons.includes('Comparables insuficientes'))
+    comparisons.push(
+      'No hay una referencia comparable suficiente según los criterios del motor; esto no implica por sí solo que el registro original esté incompleto.',
+    );
   return {
     found: reasons.join(' · ') || 'Sin señal detectada; no certifica la tarifa',
     why:
@@ -59,11 +72,21 @@ export function caseGuidance(row, population) {
       ...(reasons.includes('Diferencia de presentación SIAGRI')
         ? ['Solicitar el desglose de cantidades e importes consolidados; no reclamar una diferencia solo por la multiplicación.']
         : []),
-      ...(reasons.includes('Posible repetición')
+      ...(reasons.includes('Posible repetición documental')
         ? ['Contrastar ejecución, P.FACT, anulaciones o reemisiones en los registros coincidentes.']
         : []),
-      ...(reasons.includes('Falta información')
-        ? ['Completar los datos faltantes o aportar respaldo comparable antes de concluir.']
+      ...(reasons.includes('Igual cantidad con tarifas diferentes')
+        ? [
+            'Contrastar jornadas, condiciones y desglose de tarifas; no tratar la diferencia de tarifa como duplicación confirmada.',
+          ]
+        : []),
+      ...(reasons.includes('Datos de origen incompletos')
+        ? ['Completar o corregir el respaldo de los campos faltantes o inválidos en la fuente antes de concluir.']
+        : []),
+      ...(reasons.includes('Comparables insuficientes')
+        ? [
+            'Revisar cobertura, dimensiones y tamaño de la muestra; solicitar comparables válidos, sin completar datos originales por inferencia.',
+          ]
         : []),
     ],
   };

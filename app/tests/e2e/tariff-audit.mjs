@@ -79,7 +79,7 @@ try {
       firstPage.length === 8 && secondPage.length === 8 && !firstPage.some((id) => secondPage.includes(id)),
     );
     await queue.getByRole('button', { name: 'Anterior', exact: true }).click();
-    await queue.getByRole('button', { name: /Casos sin respaldo suficiente/ }).click();
+    await queue.getByRole('button', { name: /Comparables insuficientes/ }).click();
     check(
       `${device}: contador de respaldo coincide con su selección`,
       Number(await queue.locator('[data-tariff-review-count]').getAttribute('data-tariff-review-count')) ===
@@ -92,6 +92,7 @@ try {
     );
     if (shots) await page.screenshot({ path: path.join(shots, `${device}-resumen.png`), fullPage: true });
     await queue.getByLabel('Buscar un cobro').fill('1376');
+    if (shots) await page.screenshot({ path: path.join(shots, `${device}-busqueda-1376.png`), fullPage: true });
     const queueOpener = queue.locator('button[aria-label="Abrir evidencia de fila 1376"]:visible');
     await queueOpener.click();
     check(
@@ -224,6 +225,7 @@ try {
     );
     await view('Historial y cierres');
     check(`${device}: panel de cierres original accesible`, (await module.locator('.week-controls button').count()) > 0);
+    if (shots) await page.screenshot({ path: path.join(shots, `${device}-cierres.png`), fullPage: true });
     await view('Pendientes de revisión');
     await module.locator('.audit-method summary').click();
     await module.getByLabel('Mínimo de muestras').fill('15');

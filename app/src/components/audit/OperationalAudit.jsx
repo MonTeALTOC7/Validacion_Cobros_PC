@@ -42,11 +42,11 @@ export function OperationalQueue({ audit, onOpen, onTotal }) {
         </button>
         <button
           className="tariff-review-counter"
-          aria-pressed={reason === 'Falta información'}
-          onClick={() => select('Falta información')}
+          aria-pressed={reason === 'Comparables insuficientes'}
+          onClick={() => select('Comparables insuficientes')}
         >
-          <strong>{candidates.filter((row) => reviewReasons(row).includes('Falta información')).length}</strong>
-          <span>Casos sin respaldo suficiente</span>
+          <strong>{candidates.filter((row) => reviewReasons(row).includes('Comparables insuficientes')).length}</strong>
+          <span>Comparables insuficientes</span>
           <small>Subconjunto · no sumar al total de casos</small>
         </button>
         <button className="tariff-review-total" onClick={onTotal}>
@@ -77,7 +77,14 @@ export function OperationalQueue({ audit, onOpen, onTotal }) {
             }}
           >
             <option value="">Todos los motivos</option>
-            {['Tarifa inusual', 'Diferencia de presentación SIAGRI', 'Posible repetición', 'Falta información'].map((label) => (
+            {[
+              'Tarifa inusual',
+              'Diferencia de presentación SIAGRI',
+              'Posible repetición documental',
+              'Igual cantidad con tarifas diferentes',
+              'Datos de origen incompletos',
+              'Comparables insuficientes',
+            ].map((label) => (
               <option key={label}>{label}</option>
             ))}
           </select>
