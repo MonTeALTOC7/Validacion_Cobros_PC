@@ -205,7 +205,7 @@ try {
     await page.getByRole('button', { name: 'Ver evidencia HM fila 2', exact: true }).click();
     await page.getByRole('dialog').waitFor();
     assert.match(await page.getByRole('dialog').innerText(), /0000/);
-    await page.screenshot({ path: path.join(shots, `${label}-evidencia.png`), fullPage: true });
+    await page.screenshot({ path: path.join(shots, `${label}-evidencia.png`), fullPage: false });
     await page.keyboard.press('Escape');
     assert.equal(await page.getByRole('dialog').count(), 0);
     assert.deepEqual(errors, []);
