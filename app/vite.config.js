@@ -11,7 +11,8 @@ export default defineConfig({
   base: './',
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
-    __BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)),
+    // Explicit release metadata: identical sources must build identically on another day.
+    __BUILD_DATE__: JSON.stringify('2026-10-18'),
   },
   build: {
     outDir: 'dist',

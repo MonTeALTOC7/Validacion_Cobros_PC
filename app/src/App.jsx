@@ -11,7 +11,6 @@ import {
   Printer,
   Settings,
   ShieldCheck,
-  Sprout,
   TriangleAlert,
   Upload,
   X,
@@ -31,20 +30,21 @@ import { TrackingPanel } from './components/tracking/TrackingPanel';
 import { APP_VERSION, BUILD_DATE } from './engine/constants';
 import { exportAuditWorkbook } from './engine/exports';
 import { useConciliador } from './state/useConciliador';
+import { MechanizedPanel } from './mechanized/MechanizedPanel';
 
 // IMPORTANTE: el orden importa. La vista pública "Seguimiento de Labores" de la App Maestra
 // (modules/labores/index.html) oculta con CSS todas las pestañas salvo la 4.ª (nth-child(4)).
 // Seguimiento de labores debe seguir siendo la cuarta.
 const NAV_ITEMS = [
   { id: 'summary', label: 'Resumen', icon: LayoutDashboard },
-  { id: 'reconciliation', label: 'Conciliación', icon: ClipboardCheck },
+  { id: 'reconciliation', label: 'Conciliación Nómina', icon: ClipboardCheck },
   { id: 'review', label: 'Revisión por Correo', icon: FileSearch },
   { id: 'tracking', label: 'Seguimiento de labores', icon: ChartColumn },
   { id: 'finance', label: 'Financiero', icon: Landmark },
-  { id: 'tps', label: 'Paquetes TPS', icon: Sprout },
   { id: 'audit', label: 'Auditoría de tarifas y cobros', icon: ShieldCheck },
   { id: 'load', label: 'Actualizar archivos', icon: Upload },
   { id: 'parameters', label: 'Parámetros', icon: Settings },
+  { id: 'mechanized', label: 'Cobros mecanizados', icon: FileSearch },
 ];
 
 const initialView = () => (typeof window !== 'undefined' && window.location.hash === '#tracking' ? 'tracking' : 'summary');
@@ -52,12 +52,14 @@ const initialView = () => (typeof window !== 'undefined' && window.location.hash
 export function App() {
   const app = useConciliador();
   const [view, setView] = useState(initialView);
+  const [reconciliationTab, setReconciliationTab] = useState('general');
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedFinding, setSelectedFinding] = useState(null);
   const { analysis, inputs, parameters, multiYear, notice } = app;
 
   const navigate = (id) => {
-    setView(id);
+    setView(id === 'tps' ? 'reconciliation' : id);
+    if (id === 'tps' || id === 'reconciliation') setReconciliationTab(id === 'tps' ? 'tps' : 'general');
     setMenuOpen(false);
   };
 
@@ -118,7 +120,7 @@ export function App() {
             <strong className="signature-name">Carlos Tijerino</strong>
           </div>
           <div className="top-actions">
-            {analysis && view !== 'tracking' && view !== 'finance' && (
+            {analysis && view !== 'tracking' && view !== 'finance' && view !== 'mechanized' && (
               <>
                 <button className="button secondary" onClick={() => window.print()}>
                   <Printer size={17} /> PDF
@@ -159,6 +161,26 @@ export function App() {
             />
           )}
           {view === 'reconciliation' && (
+            <div role="tablist" aria-label="Conciliación Nómina" className="reconciliation-tabs">
+              <button
+                className="button secondary"
+                role="tab"
+                aria-selected={reconciliationTab === 'general'}
+                onClick={() => setReconciliationTab('general')}
+              >
+                Conciliación general
+              </button>
+              <button
+                className="button secondary"
+                role="tab"
+                aria-selected={reconciliationTab === 'tps'}
+                onClick={() => setReconciliationTab('tps')}
+              >
+                Paquetes TPS
+              </button>
+            </div>
+          )}
+          {view === 'reconciliation' && reconciliationTab === 'general' && (
             <Panel
               title="Conciliación semanal"
               subtitle="La Nómina es la base; P.FACT demuestra el cobro. La columna Tarifa muestra las tarifas cobradas en la Prefactura."
@@ -182,7 +204,7 @@ export function App() {
           {view === 'finance' && (
             <FinancePanel inputs={inputs} analysis={analysis} startDate={parameters.startDate} parameters={parameters} />
           )}
-          {view === 'tps' && (
+          {view === 'reconciliation' && reconciliationTab === 'tps' && (
             <Panel
               title="Paquetes de siembra TPS"
               subtitle="RYA 19084/19085 es la cantidad principal; corte y descargue corroboran."
@@ -244,6 +266,14 @@ export function App() {
             </>
           )}
           {view === 'parameters' && <ParametersPanel parameters={parameters} onSave={app.updateParameters} />}
+          {view === 'mechanized' && (
+            <MechanizedPanel
+              prefactura={inputs.prefactura}
+              prefacturaFile={inputs.files.find((file) => file.kind === 'prefactura')}
+              onPrefacturaFile={(file) => app.importFile('prefactura', file)}
+              importBusy={app.busyKind !== null}
+            />
+          )}
         </div>
       </main>
       {selectedFinding && (

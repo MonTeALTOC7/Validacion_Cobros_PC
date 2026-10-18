@@ -32,16 +32,18 @@ try {
     const before = await readDb(page);
     const nav = async () => {
       if (device === 'móvil') await page.getByRole('button', { name: 'Abrir menú', exact: true }).click();
-      await page.locator('.sidebar nav button').nth(6).click();
+      await page.locator('.sidebar nav').getByRole('button', { name: 'Auditoría de tarifas y cobros', exact: true }).click();
       await page.locator('.audit-scope').waitFor();
       if (device === 'móvil')
         await page.waitForFunction(() => document.querySelector('.sidebar').getBoundingClientRect().right <= 0);
     };
     await nav();
     check(
-      `${device}: séptima Auditoría y cuarta Seguimiento`,
-      /Auditoría de tarifas/.test(await page.locator('.sidebar nav button').nth(6).innerText()) &&
-        /Seguimiento/.test(await page.locator('.sidebar nav button').nth(3).innerText()),
+      `${device}: Auditoría accesible y cuarta Seguimiento`,
+      (await page
+        .locator('.sidebar nav')
+        .getByRole('button', { name: 'Auditoría de tarifas y cobros', exact: true })
+        .isVisible()) && /Seguimiento/.test(await page.locator('.sidebar nav button').nth(3).innerText()),
     );
     const module = page.locator('.tariff-audit-module');
     const view = async (name) =>
