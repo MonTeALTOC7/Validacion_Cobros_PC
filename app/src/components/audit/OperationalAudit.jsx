@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
-import { filterAuditRows } from '../../engine/audit/tariffAudit';
 import { FINANCE_UNIVERSES } from '../../engine/finance';
 import { formatCurrency, formatNumber } from '../../lib/format';
-import { caseGuidance, observedReference, reviewReasons, reviewRows, trend } from './operationalPresentation';
+import { caseGuidance, filterReviewRows, observedReference, reviewReasons, reviewRows, trend } from './operationalPresentation';
 
 const value = (number) => (Number.isFinite(number) ? formatNumber(number, 2) : 'No disponible');
 const text = (item) => (item === null || item === undefined || item === '' ? 'No disponible' : String(item));
@@ -17,19 +16,17 @@ function References({ population }) {
   );
 }
 
-export function OperationalQueue({ audit, onOpen, onTotal }) {
-  const [search, setSearch] = useState('');
-  const [reason, setReason] = useState('');
+export function OperationalQueue({ audit, onOpen, onTotal, search, reason, onSearchChange, onReasonChange }) {
   const [page, setPage] = useState(0);
   const candidates = useMemo(() => reviewRows(audit.rows), [audit]);
   const populations = useMemo(() => new Map(audit.populations.map((item) => [item.key, item])), [audit]);
-  const rows = filterAuditRows(candidates, { search }).filter((row) => !reason || reviewReasons(row).includes(reason));
+  const rows = useMemo(() => filterReviewRows(audit.rows, { search, reason }), [audit, search, reason]);
   const pages = Math.max(1, Math.ceil(rows.length / 8));
   const currentPage = Math.min(page, pages - 1);
   const visible = rows.slice(currentPage * 8, currentPage * 8 + 8);
   const select = (next) => {
-    setReason(next);
-    setSearch('');
+    onSearchChange('');
+    onReasonChange(next);
     setPage(0);
   };
   return (
@@ -61,7 +58,7 @@ export function OperationalQueue({ audit, onOpen, onTotal }) {
           <input
             value={search}
             onChange={(event) => {
-              setSearch(event.target.value);
+              onSearchChange(event.target.value);
               setPage(0);
             }}
             placeholder="Productor, hacienda, CMN, P.FACT o fila 1376"
@@ -72,7 +69,7 @@ export function OperationalQueue({ audit, onOpen, onTotal }) {
           <select
             value={reason}
             onChange={(event) => {
-              setReason(event.target.value);
+              onReasonChange(event.target.value);
               setPage(0);
             }}
           >

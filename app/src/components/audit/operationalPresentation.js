@@ -1,4 +1,6 @@
 // Solo presentación de resultados del motor; no recalibra referencias ni genera dictámenes.
+import { filterAuditRows } from '../../engine/audit/tariffAudit';
+
 export const reviewReasons = (row) => {
   const rules = new Set(row.observations.map((item) => item.rule));
   return [
@@ -21,6 +23,9 @@ export const reviewRows = (rows) =>
       Number(b.observations.length > 0) - Number(a.observations.length > 0) ||
       (a.sourceRow ?? 0) - (b.sourceRow ?? 0),
   );
+
+export const filterReviewRows = (rows, { search = '', reason = '' } = {}) =>
+  filterAuditRows(reviewRows(rows), { search }).filter((row) => !reason || reviewReasons(row).includes(reason));
 
 export const observedReference = (population, metric) => {
   const ref = population?.[metric];

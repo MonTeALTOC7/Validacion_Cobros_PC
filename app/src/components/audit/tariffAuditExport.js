@@ -145,7 +145,11 @@ const filtersText = (filters = {}) =>
     .map(([key, value]) => `${key}: ${value || 'Todos'}`)
     .join(' · ');
 
-export function buildTariffAuditWorkbook(audit, inputs, { rows = audit.rows, filters = {}, scope = 'complete' } = {}) {
+export function buildTariffAuditWorkbook(
+  audit,
+  inputs,
+  { rows = audit.rows, filters = {}, scope = 'complete', view = 'No especificada' } = {},
+) {
   const selected = scope === 'complete' ? audit.rows : rows;
   const selectedIds = new Set(selected.map((row) => row.auditId));
   const review = reviewRows(selected);
@@ -167,6 +171,7 @@ export function buildTariffAuditWorkbook(audit, inputs, { rows = audit.rows, fil
 
   appendSheet(workbook, 'Resumen', [
     { Indicador: 'Alcance', Valor: scope === 'complete' ? 'Prefactura completa' : 'Selección filtrada' },
+    { Indicador: 'Vista consultada', Valor: view },
     { Indicador: 'Generado', Valor: GENERATED_AT() },
     { Indicador: 'Archivos fuente', Valor: sourceFiles.map((file) => file.name).join(' · ') || 'No disponible' },
     {
@@ -177,7 +182,13 @@ export function buildTariffAuditWorkbook(audit, inputs, { rows = audit.rows, fil
       Indicador: 'SHA-256 fuente',
       Valor: sourceFiles.map((file) => `${file.name}: ${file.hash ?? 'No disponible'}`).join(' · ') || 'No disponible',
     },
-    { Indicador: 'Filtros de interfaz', Valor: filtersText(filters) || 'Sin filtros' },
+    {
+      Indicador:
+        scope === 'complete'
+          ? 'Filtros presentes en la vista (no aplicados al archivo completo)'
+          : 'Filtros aplicados a esta selección',
+      Valor: filtersText(filters) || 'Sin filtros',
+    },
     { Indicador: 'Líneas en el archivo fuente', Valor: sourceRows },
     { Indicador: 'Líneas en este alcance', Valor: selected.length },
     { Indicador: 'Total informado en este alcance (C$)', Valor: selectedTotal },

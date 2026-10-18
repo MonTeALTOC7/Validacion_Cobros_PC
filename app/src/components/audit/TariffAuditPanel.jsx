@@ -7,6 +7,7 @@ import { Field, LineFields } from '../drill/LineFields';
 import { analyzeTariffs, AUDIT_DEFAULTS, AUDIT_RULES, filterAuditRows } from '../../engine/audit/tariffAudit';
 import { FINANCE_UNIVERSES } from '../../engine/finance';
 import { formatCurrency, formatNumber } from '../../lib/format';
+import { filterReviewRows } from './operationalPresentation';
 import './tariff-audit.css';
 import { CaseExplanation, OperationalEvolution, OperationalQueue } from './OperationalAudit';
 import { exportTariffAuditWorkbook } from './tariffAuditExport';
@@ -28,6 +29,7 @@ const categories = {
   NON_POSITIVE: 'Ceros o negativos',
 };
 const DEFAULT_FILTERS = { search: '', category: 'observed', service: '', unit: '', contractorCode: '', universe: '', month: '' };
+const DEFAULT_QUEUE_FILTERS = { search: '', reason: '' };
 const VIEWS = {
   summary: 'Pendientes de revisión',
   rates: 'Evolución de tarifas',
@@ -91,10 +93,12 @@ export function TariffAuditPanel(props) {
   const [view, setView] = useState('summary');
   const [config, setConfig] = useState(AUDIT_DEFAULTS);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [queueFilters, setQueueFilters] = useState(DEFAULT_QUEUE_FILTERS);
   const [stack, setStack] = useState(null);
   const [seriesKey, setSeriesKey] = useState('');
   const audit = useMemo(() => analyzeTariffs(inputs.prefactura, config), [inputs.prefactura, config]);
   const rows = useMemo(() => filterAuditRows(audit.rows, filters), [audit, filters]);
+  const queueRows = useMemo(() => filterReviewRows(audit.rows, queueFilters), [audit, queueFilters]);
   const changeFilter = (key, value) => setFilters((previous) => ({ ...previous, [key]: value }));
   const showCategory = (category) => {
     setFilters({ ...DEFAULT_FILTERS, category });
@@ -104,6 +108,23 @@ export function TariffAuditPanel(props) {
   const openLine = (row) => setStack([{ title: `Prefactura · fila ${row.sourceRow}`, kind: 'line', row }]);
   const source = inputs.files?.find((file) => file.kind === 'prefactura');
   const series = audit.history.find((item) => item.key === seriesKey) ?? audit.history[0];
+  const seriesRowIds = useMemo(() => new Set([...(series?.before.rowIds ?? []), ...(series?.after.rowIds ?? [])]), [series]);
+  const seriesRows = useMemo(() => audit.rows.filter((row) => seriesRowIds.has(row.auditId)), [audit, seriesRowIds]);
+  const selectionRows = view === 'summary' ? queueRows : view === 'rates' ? seriesRows : rows;
+  const selectionView = view === 'summary' ? 'Cobros que requieren revisión' : VIEWS[view];
+  const selectionFilters =
+    view === 'summary'
+      ? {
+          'Búsqueda en bandeja': queueFilters.search || 'Ninguna',
+          'Motivo en bandeja': queueFilters.reason || 'Todos los motivos',
+        }
+      : view === 'rates'
+        ? {
+            'Serie comparable': series
+              ? `${series.service} · ${series.labor} · ${series.unit} · ${series.contractorCode || 'Sin contratista'}`
+              : 'Sin serie disponible',
+          }
+        : filters;
   const periods = audit.populations.filter((item) => item.comparableKey === series?.key);
 
   return (
@@ -116,6 +137,7 @@ export function TariffAuditPanel(props) {
             aria-pressed={view === key}
             onClick={() => {
               if (key === 'discrepancies') setFilters({ ...DEFAULT_FILTERS, category: 'all' });
+              if (key !== 'summary') setQueueFilters(DEFAULT_QUEUE_FILTERS);
               setView(key);
             }}
           >
@@ -131,16 +153,31 @@ export function TariffAuditPanel(props) {
             <strong>Exportar Excel</strong>
             <button
               className="button secondary"
-              onClick={() => exportTariffAuditWorkbook(audit, inputs, { scope: 'complete', filters })}
+              onClick={() =>
+                exportTariffAuditWorkbook(audit, inputs, {
+                  scope: 'complete',
+                  filters: selectionFilters,
+                  view: selectionView,
+                })
+              }
             >
               Toda la Prefactura ({audit.rows.length.toLocaleString('es-NI')})
             </button>
             <button
               className="button secondary"
-              disabled={!rows.length}
-              onClick={() => exportTariffAuditWorkbook(audit, inputs, { scope: 'selection', rows, filters })}
+              disabled={!selectionRows.length}
+              data-export-selection-count={selectionRows.length}
+              data-export-selection-view={selectionView}
+              onClick={() =>
+                exportTariffAuditWorkbook(audit, inputs, {
+                  scope: 'selection',
+                  rows: selectionRows,
+                  filters: selectionFilters,
+                  view: selectionView,
+                })
+              }
             >
-              Selección actual ({rows.length.toLocaleString('es-NI')})
+              Selección actual ({selectionRows.length.toLocaleString('es-NI')})
             </button>
           </div>
           <section className="audit-scope" aria-label="Alcance de la auditoría">
@@ -168,6 +205,10 @@ export function TariffAuditPanel(props) {
                     audit={audit}
                     onOpen={openLine}
                     onTotal={() => openGroup(audit.rows, 'Prefactura completa')}
+                    search={queueFilters.search}
+                    reason={queueFilters.reason}
+                    onSearchChange={(search) => setQueueFilters((current) => ({ ...current, search }))}
+                    onReasonChange={(reason) => setQueueFilters((current) => ({ ...current, reason }))}
                   />
                   <details className="panel audit-technical-summary">
                     <summary>Indicadores técnicos y desglose del importe</summary>

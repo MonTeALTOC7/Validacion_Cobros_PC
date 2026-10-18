@@ -4,6 +4,7 @@ import { parsePrefacturaFile } from '../../src/engine/importers';
 import { analyzeTariffs } from '../../src/engine/audit/tariffAudit';
 import {
   caseGuidance,
+  filterReviewRows,
   observedReference,
   reviewReasons,
   reviewRows,
@@ -85,6 +86,9 @@ describe('presentación operativa sin cambios al motor', () => {
     const snapshot = JSON.stringify(audit);
     const queue = reviewRows(audit.rows);
     const cmn = queue.find((item) => item.sourceRow === 1376);
+    expect(filterReviewRows(audit.rows, { search: '1376' }).map((item) => item.auditId)).toEqual([cmn.auditId]);
+    expect(filterReviewRows(audit.rows, { reason: 'Comparables insuficientes' })).toHaveLength(417);
+    expect(filterReviewRows(audit.rows, { search: '1376', reason: 'Comparables insuficientes' })).toHaveLength(0);
     expect(cmn.tariff).toBe(0.88);
     expect(cmn.total).toBe(7.32);
     const population = audit.populations.find((item) => item.key === cmn.populationKey);

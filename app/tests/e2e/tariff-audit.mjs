@@ -90,11 +90,13 @@ try {
       const selectionFile = await downloadSelection;
       const selectionBook = read(await readFile(await selectionFile.path()), { type: 'buffer' });
       const selectionRows = utils.sheet_to_json(selectionBook.Sheets.Prefactura, { defval: '' });
+      const selectionSummary = utils.sheet_to_json(selectionBook.Sheets.Resumen, { defval: '' });
       check(
-        'Excel de selección respeta filtros y conserva P.FACT como texto',
+        'Excel de Todos los registros respeta filtros y conserva P.FACT como texto',
         selectionRows.length === 1 &&
           selectionRows[0]['Fila origen'] === 1376 &&
           selectionRows[0]['P.FACT'] === '16183' &&
+          selectionSummary.find((row) => row.Indicador === 'Vista consultada')?.Valor === 'Todos los registros' &&
           selectionBook.Sheets.Prefactura.A2.t === 's',
       );
       await view('Pendientes de revisión');
@@ -133,10 +135,34 @@ try {
     );
     await queue.getByRole('button', { name: 'Anterior', exact: true }).click();
     await queue.getByRole('button', { name: /Comparables insuficientes/ }).click();
+    const insufficientCount = Number(await queue.locator('[data-tariff-review-count]').getAttribute('data-tariff-review-count'));
+    const insufficientButton = module.getByRole('button', { name: /Selección actual/ });
     check(
-      `${device}: contador de respaldo coincide con su selección`,
-      Number(await queue.locator('[data-tariff-review-count]').getAttribute('data-tariff-review-count')) ===
-        Number(await queue.locator('.tariff-review-counter').nth(1).locator('strong').innerText()),
+      `${device}: filtro de comparables insuficientes cuenta toda la subvista`,
+      insufficientCount === 417 &&
+        insufficientCount === Number(await queue.locator('.tariff-review-counter').nth(1).locator('strong').innerText()) &&
+        insufficientCount === Number(await insufficientButton.getAttribute('data-export-selection-count')) &&
+        (await visibleRows().count()) === 8,
+    );
+    const downloadInsufficient = page.waitForEvent('download');
+    await insufficientButton.click();
+    const insufficientFile = await downloadInsufficient;
+    const insufficientBook = read(await readFile(await insufficientFile.path()), { type: 'buffer' });
+    if (device === 'PC')
+      await copyFile(
+        await insufficientFile.path(),
+        path.join(appDir, 'test-results', 'auditoria_tarifas_cobros_seleccion_417_muestra.xlsx'),
+      );
+    const insufficientExport = utils.sheet_to_json(insufficientBook.Sheets.Prefactura, { defval: '' });
+    const insufficientSummary = utils.sheet_to_json(insufficientBook.Sheets.Resumen, { defval: '' });
+    const insufficientEvidence = utils.sheet_to_json(insufficientBook.Sheets.Evidencia, { defval: '' });
+    check(
+      `${device}: XLSX exporta los 417 comparables sin recortar a la página`,
+      insufficientExport.length === 417 &&
+        insufficientEvidence.length === 417 &&
+        insufficientExport.every((row) => row['Comparables suficientes'] === false) &&
+        insufficientSummary.find((row) => row.Indicador === 'Vista consultada')?.Valor === 'Cobros que requieren revisión' &&
+        insufficientSummary.find((row) => row.Indicador === 'Líneas en este alcance')?.Valor === 417,
     );
     await queue.getByRole('button', { name: /Casos para revisar/ }).click();
     check(
@@ -145,6 +171,49 @@ try {
     );
     if (shots) await page.screenshot({ path: path.join(shots, `${device}-resumen.png`), fullPage: true });
     await queue.getByLabel('Buscar un cobro').fill('1376');
+    const queueSelection = module.getByRole('button', { name: /Selección actual/ });
+    const queueCount = Number(await queue.locator('[data-tariff-review-count]').getAttribute('data-tariff-review-count'));
+    check(
+      `${device}: selección de bandeja y contador muestran una fila`,
+      queueCount === 1 &&
+        queueCount === Number(await queueSelection.getAttribute('data-export-selection-count')) &&
+        (await queueSelection.innerText().then((label) => /Selección actual \(1\)/.test(label))),
+    );
+    const downloadQueueSelection = page.waitForEvent('download');
+    await queueSelection.click();
+    const queueSelectionFile = await downloadQueueSelection;
+    const queueSelectionBook = read(await readFile(await queueSelectionFile.path()), { type: 'buffer' });
+    if (device === 'PC')
+      await copyFile(
+        await queueSelectionFile.path(),
+        path.join(appDir, 'test-results', 'auditoria_tarifas_cobros_seleccion_cmn_1376_muestra.xlsx'),
+      );
+    const queueSelectionRows = utils.sheet_to_json(queueSelectionBook.Sheets.Prefactura, { defval: '' });
+    const queueEvidenceRows = utils.sheet_to_json(queueSelectionBook.Sheets.Evidencia, { defval: '' });
+    const queueSummary = utils.sheet_to_json(queueSelectionBook.Sheets.Resumen, { defval: '' });
+    const queueRow = queueSelectionRows[0];
+    check(
+      `${device}: búsqueda 1376 exporta solo CMN con importe y evidencia originales`,
+      queueSelectionRows.length === 1 &&
+        queueRow?.['Fila origen'] === 1376 &&
+        queueRow?.Labor === 'CMN' &&
+        queueRow?.Servicio === '16013' &&
+        queueRow?.['Productor código'] === 'CL1105' &&
+        queueRow?.Productor === 'PANSACO' &&
+        queueRow?.['Hacienda código'] === '993' &&
+        queueRow?.Suerte === '10' &&
+        queueRow?.Unidades === 8.32 &&
+        queueRow?.['Tarifa reportada'] === 0.88 &&
+        queueRow?.['Total Prefactura'] === 7.32 &&
+        queueRow?.['P.FACT'] === '16183' &&
+        queueRow?.Archivo === 'Prefactura_01-ene-11-oct-26.xlsx' &&
+        queueRow?.Hoja === 'REPORTE' &&
+        queueEvidenceRows.length === 1 &&
+        queueEvidenceRows[0]?.Fila === 1376 &&
+        queueEvidenceRows[0]?.['P.FACT'] === '16183' &&
+        queueSummary.find((row) => row.Indicador === 'Vista consultada')?.Valor === 'Cobros que requieren revisión' &&
+        queueSummary.find((row) => row.Indicador === 'Filtros aplicados a esta selección')?.Valor.includes('1376'),
+    );
     if (shots) await page.screenshot({ path: path.join(shots, `${device}-busqueda-1376.png`), fullPage: true });
     const queueOpener = queue.locator('button[aria-label="Abrir evidencia de fila 1376"]:visible');
     await queueOpener.click();
@@ -256,6 +325,24 @@ try {
       (await module.locator('.evolution-month').count()) > 1 &&
         !(await module.locator('.audit-history-technical').evaluate((element) => element.open)),
     );
+    const seriesSelectionButton = module.getByRole('button', { name: /Selección actual/ });
+    const seriesSelectionCount = Number(await seriesSelectionButton.getAttribute('data-export-selection-count'));
+    const downloadSeries = page.waitForEvent('download');
+    await seriesSelectionButton.click();
+    const seriesFile = await downloadSeries;
+    const seriesBook = read(await readFile(await seriesFile.path()), { type: 'buffer' });
+    const seriesRows = utils.sheet_to_json(seriesBook.Sheets.Prefactura, { defval: '' });
+    const seriesSummary = utils.sheet_to_json(seriesBook.Sheets.Resumen, { defval: '' });
+    check(
+      `${device}: selección de Evolución exporta la serie consultada`,
+      seriesRows.length === seriesSelectionCount &&
+        seriesRows.length > 0 &&
+        seriesRows.every(
+          (row) => row.Servicio === '16013' && row.Labor === 'CMN' && row.UM === 'HA' && row['Contratista código'] === 'CS9999',
+        ) &&
+        seriesSummary.find((row) => row.Indicador === 'Vista consultada')?.Valor === 'Evolución de tarifas' &&
+        seriesSummary.find((row) => row.Indicador === 'Filtros aplicados a esta selección')?.Valor.includes('16013'),
+    );
     if (shots) await page.screenshot({ path: path.join(shots, `${device}-evolucion.png`), fullPage: true });
     await module.locator('.audit-history-technical summary').click();
     const rates = await module.innerText();
@@ -274,8 +361,24 @@ try {
     await view('Todos los registros');
     check(
       `${device}: todos los registros sin filtro heredado`,
-      Number(await module.locator('[data-audit-count]').getAttribute('data-audit-count')) === 4452,
+      Number(await module.locator('[data-audit-count]').getAttribute('data-audit-count')) === 4452 &&
+        Number(await module.getByRole('button', { name: /Selección actual/ }).getAttribute('data-export-selection-count')) ===
+          4452,
     );
+    if (device === 'PC') {
+      const downloadAllRows = page.waitForEvent('download');
+      await module.getByRole('button', { name: /Selección actual/ }).click();
+      const allRowsFile = await downloadAllRows;
+      const allRowsBook = read(await readFile(await allRowsFile.path()), { type: 'buffer' });
+      const allRowsExport = utils.sheet_to_json(allRowsBook.Sheets.Prefactura, { defval: '' });
+      const allRowsSummary = utils.sheet_to_json(allRowsBook.Sheets.Resumen, { defval: '' });
+      check(
+        'Excel de Todos los registros no hereda filtros de la bandeja ni la serie',
+        allRowsExport.length === 4452 &&
+          allRowsSummary.find((row) => row.Indicador === 'Vista consultada')?.Valor === 'Todos los registros' &&
+          allRowsSummary.find((row) => row.Indicador === 'Líneas en este alcance')?.Valor === 4452,
+      );
+    }
     await view('Historial y cierres');
     check(`${device}: panel de cierres original accesible`, (await module.locator('.week-controls button').count()) > 0);
     if (shots) await page.screenshot({ path: path.join(shots, `${device}-cierres.png`), fullPage: true });
