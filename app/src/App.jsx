@@ -31,6 +31,7 @@ import { TrackingPanel } from './components/tracking/TrackingPanel';
 import { APP_VERSION, BUILD_DATE } from './engine/constants';
 import { exportAuditWorkbook } from './engine/exports';
 import { useConciliador } from './state/useConciliador';
+import { MechanizedPanel } from './mechanized/MechanizedPanel';
 
 // IMPORTANTE: el orden importa. La vista pública "Seguimiento de Labores" de la App Maestra
 // (modules/labores/index.html) oculta con CSS todas las pestañas salvo la 4.ª (nth-child(4)).
@@ -45,6 +46,7 @@ const NAV_ITEMS = [
   { id: 'audit', label: 'Auditoría de tarifas y cobros', icon: ShieldCheck },
   { id: 'load', label: 'Actualizar archivos', icon: Upload },
   { id: 'parameters', label: 'Parámetros', icon: Settings },
+  { id: 'mechanized', label: 'Cobros mecanizados', icon: FileSearch },
 ];
 
 const initialView = () => (typeof window !== 'undefined' && window.location.hash === '#tracking' ? 'tracking' : 'summary');
@@ -118,7 +120,7 @@ export function App() {
             <strong className="signature-name">Carlos Tijerino</strong>
           </div>
           <div className="top-actions">
-            {analysis && view !== 'tracking' && view !== 'finance' && (
+            {analysis && view !== 'tracking' && view !== 'finance' && view !== 'mechanized' && (
               <>
                 <button className="button secondary" onClick={() => window.print()}>
                   <Printer size={17} /> PDF
@@ -244,6 +246,7 @@ export function App() {
             </>
           )}
           {view === 'parameters' && <ParametersPanel parameters={parameters} onSave={app.updateParameters} />}
+          {view === 'mechanized' && <MechanizedPanel prefactura={inputs.prefactura} onLoadPrefactura={() => navigate('load')} />}
         </div>
       </main>
       {selectedFinding && (

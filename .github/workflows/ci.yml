@@ -108,6 +108,11 @@ jobs:
       - name: Auditoría tarifaria aislada en escritorio y móvil
         run: node tests/e2e/tariff-audit.mjs --site ..
 
+      - name: Importadores mecanizados Etapa A (datos sintéticos)
+        run: node tests/e2e/mechanized.mjs
+        env:
+          MECHANIZED_SHOTS: ${{ runner.temp }}/mechanized-shots
+
       - name: Actualización desde v0.7 en el mismo origen
         run: node tests/e2e/upgrade.mjs
 
