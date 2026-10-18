@@ -7,6 +7,8 @@ export const FIELDS = [
   ['hacienda', 'Nombre hacienda', ['Nombre Hacienda']],
   ['suerte', 'Suerte', ['Suerte', 'Ste']],
   ['date', 'Fecha', ['Fecha']],
+  ['zone', 'Zona', ['Zona']],
+  ['week', 'Semana', ['Semana']],
   ['period', 'Período', ['Periodo']],
   ['labor', 'Código labor', ['Labor']],
   ['laborName', 'Descripción labor', ['Labor2', 'Descripcion']],
@@ -113,7 +115,7 @@ export async function normalizeSource(source, sheetIndex, headerRow, mapping, ki
     if (!row.haciendaCode && !row.hacienda) reasons.push('Hacienda vacía');
     if (!row.suerte || !row.labor) reasons.push('Suerte o labor vacía');
     if ((get('date') !== '' && !row.date) || (!row.date && !row.period)) reasons.push('Fecha inválida o período ausente');
-    if (kind === 'hm' && row.unit !== 'HR') reasons.push(`Unidad ${row.unit || 'vacía'}: fuera del alcance HR`);
+    if (kind === 'hm' && !row.unit) reasons.push('Unidad vacía');
     if ((kind === 'hm' && (quantity.empty || quantity.value <= 0)) || !quantity.valid) reasons.push('Cantidad inválida');
     const reference = { sourceFile: source.name, sourceSheet: sheet.name, sourceRow: i + 1 };
     // Full content signature is retained to detect hypothetical SHA collisions.

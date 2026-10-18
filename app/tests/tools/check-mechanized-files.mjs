@@ -23,6 +23,12 @@ for (let index = 0; index < hm.sheets.length; index++) {
       accepted: result.rows.length,
       excluded: result.rejected.length,
       exactRepeats: result.duplicateRows,
+      units: Object.fromEntries(['HR', 'KM'].map((unit) => [unit, result.rows.filter((r) => r.unit === unit).length])),
+      kmLabors: Object.fromEntries(
+        ['ALC', 'ALR'].map((labor) => [labor, result.rows.filter((r) => r.unit === 'KM' && r.labor === labor).length]),
+      ),
+      zone5: result.rows.filter((r) => r.zone === '5').length,
+      withWeek: result.rows.filter((r) => r.week !== '').length,
       reasons: [...new Set(result.rejected.flatMap((r) => r.reasons))],
     }),
   );

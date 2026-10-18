@@ -19,3 +19,14 @@ export function coverage(rows) {
     .sort();
   return dates.length ? `${dates[0]} a ${dates.at(-1)}` : 'Sin fechas verificables';
 }
+
+// Counts of movements only: never add quantities with different dimensions.
+export function unitDistribution(rows) {
+  return Object.entries(
+    rows.reduce((counts, row) => {
+      const unit = row.unit || 'Sin unidad';
+      counts[unit] = (counts[unit] || 0) + 1;
+      return counts;
+    }, {}),
+  ).sort(([a], [b]) => a.localeCompare(b));
+}

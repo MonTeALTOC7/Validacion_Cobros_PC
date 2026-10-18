@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { utils, write } from 'xlsx';
 import { openSource, openTSV, suggestMapping, normalizeSource } from '../../src/mechanized/importers';
-import { inventory } from '../../src/mechanized/model';
+import { inventory, unitDistribution } from '../../src/mechanized/model';
 
 const headers = [
   'Fecha',
@@ -20,6 +20,59 @@ const source = (rows) => ({ name: 'prueba.xlsx', sheets: [{ name: 'REPORTE', mat
 const normalize = (rows) => normalizeSource(source(rows), 0, 0, suggestMapping(headers, 'hm'), 'hm');
 
 describe('Mecanizadas Etapa A', () => {
+  it('conserva 200 movimientos, 163 HR y 37 KM (31 ALC / 6 ALR), Zona/Semana y originales', async () => {
+    const matrix = [
+      [...headers, 'Zona', 'Semana'],
+      ...Array.from({ length: 200 }, (_, i) => {
+        const r = [...row];
+        r[4] = i < 163 ? 'HR' : 'KM';
+        r[5] = i < 163 ? 'MEC' : i < 194 ? 'ALC' : 'ALR';
+        r[7] = `D${i}`;
+        return [...r, 5, 40];
+      }),
+    ];
+    const result = await normalizeSource(
+      { name: 'sintetico.xlsx', sheets: [{ name: 'REPORTE', matrix }] },
+      0,
+      0,
+      suggestMapping(matrix[0], 'hm'),
+      'hm',
+    );
+    expect(result.rows).toHaveLength(200);
+    expect(result.rejected).toHaveLength(0);
+    expect(unitDistribution(result.rows)).toEqual([
+      ['HR', 163],
+      ['KM', 37],
+    ]);
+    expect(result.rows.filter((r) => r.labor === 'ALC')).toHaveLength(31);
+    expect(result.rows.filter((r) => r.labor === 'ALR')).toHaveLength(6);
+    for (const [i, r] of result.rows.entries()) {
+      expect(r).toMatchObject({
+        zone: '5',
+        week: '40',
+        units: 5.1,
+        sourceRow: i + 2,
+        sourceFile: 'sintetico.xlsx',
+        sourceSheet: 'REPORTE',
+      });
+      expect(r.original.slice(-2).map((c) => c.value)).toEqual([5, 40]);
+    }
+    const missing = await normalize([row]);
+    expect(missing.rows[0]).toMatchObject({ zone: '', week: '' });
+  });
+  it('conserva servicio SAP, UM y clasificación de Prefactura ZGC sin inferir mecanización', () => {
+    const pf = Object.freeze([
+      Object.freeze({ id: 'a', labor: 'ZGC', service: 'SAP-1', unit: 'HA', classification: 'Mecanizada', pFact: '0001' }),
+      Object.freeze({ id: 'b', labor: 'ZGC', service: 'SAP-2', unit: 'D-H', classification: 'Manual', pFact: '0002' }),
+      Object.freeze({ id: 'c', labor: 'ZGC', service: 'SAP-3', unit: 'HA', pFact: '0003' }),
+    ]);
+    const before = JSON.stringify(pf);
+    const rows = inventory([], pf, [], 'ZGC');
+    expect(rows).toHaveLength(3);
+    rows.forEach((r, i) => expect(r).toMatchObject(pf[i]));
+    expect(rows[2].classification).toBeUndefined();
+    expect(JSON.stringify(pf)).toBe(before);
+  });
   it('lee Excel con hojas alternativas y encabezados Labor repetidos sin fusionarlas', async () => {
     const wb = utils.book_new();
     utils.book_append_sheet(wb, utils.aoa_to_sheet([headers, row]), 'REPORTE');
@@ -48,7 +101,7 @@ describe('Mecanizadas Etapa A', () => {
     expect(a.duplicateRows).toBe(1);
     expect(a.rows[0].signature).toBe(b.rows[1].signature);
   });
-  it('rechaza KM, fechas inválidas y cantidades vacías sin convertir magnitudes', async () => {
+  it('conserva KM y rechaza fechas inválidas y cantidades vacías sin convertir magnitudes', async () => {
     const km = [...row];
     km[4] = 'KM';
     const invalid = [...row];
@@ -56,10 +109,10 @@ describe('Mecanizadas Etapa A', () => {
     const empty = [...row];
     empty[9] = '';
     const result = await normalize([row, km, invalid, empty]);
-    expect(result.rows).toHaveLength(1);
-    expect(result.rejected).toHaveLength(3);
-    expect(result.rejected[0].sourceRow).toBe(3);
-    expect(result.rejected[0].original[4].value).toBe('KM');
+    expect(result.rows).toHaveLength(2);
+    expect(result.rejected).toHaveLength(2);
+    expect(result.rows[1].sourceRow).toBe(3);
+    expect(result.rows[1].original[4].value).toBe('KM');
   });
   it('exige mapeo explícito de programación y admite período sin horas', async () => {
     const s = openTSV('Finca\tLote\tTrabajo\tPeriodo\tNota\n900\t01\tMEC\tOctubre 2026\t"Urea\nprogramada"');

@@ -16,22 +16,25 @@ const header = [
   'Nro del Documento',
   'Labor',
   'Cant.',
+  'Zona',
+  'Semana',
 ];
 const matrix = [
   header,
-  ...Array.from({ length: 54 }, (_, i) => [
+  ...Array.from({ length: 200 }, (_, i) => [
     '01/10/2026',
     '900',
     'FINCA DEMOSTRACIÓN',
     String(i + 1).padStart(2, '0'),
-    'HR',
-    i % 2 ? 'MEC' : 'FTS',
+    i < 163 ? 'HR' : 'KM',
+    i < 163 ? (i % 2 ? 'MEC' : 'FTS') : i < 194 ? 'ALC' : 'ALR',
     'T-01',
     `000${i}`,
     'Labor sintética',
     2,
+    5,
+    40,
   ]),
-  ['01/10/2026', '900', 'FINCA DEMOSTRACIÓN', '01', 'KM', 'TRA', 'T-01', '00099', 'Traslado sintético', 4],
 ];
 utils.book_append_sheet(workbook, utils.aoa_to_sheet(matrix), 'REPORTE');
 const bytes = write(workbook, { bookType: 'xlsx', type: 'buffer' });
@@ -77,12 +80,22 @@ try {
       buffer: bytes,
     });
     await page.getByRole('button', { name: 'Validar importación' }).click();
-    await page.getByText('54 filas admitidas · 1 excluidas · 0 repeticiones exactas').waitFor();
-    await page.getByRole('button', { name: 'Incorporar 54 registros' }).click();
-    await page.getByText('54 registros', { exact: true }).waitFor();
+    await page.getByText('200 filas admitidas · 0 excluidas · 0 repeticiones exactas').waitFor();
+    await page.getByRole('button', { name: 'Incorporar 200 registros' }).click();
+    await page.getByText('200 registros', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Siguiente', exact: true }).click();
-    assert.equal(await page.locator('.mec-inbox tbody tr').count(), 4);
+    assert.equal(await page.locator('.mec-inbox tbody tr').count(), 50);
     await page.getByRole('button', { name: 'Anterior', exact: true }).click();
+    await page.getByLabel('Unidad de evidencia', { exact: true }).selectOption('KM');
+    await page.getByText('37 registros', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Ver evidencia HM fila 165', exact: true }).click();
+    assert.match(await page.getByRole('dialog').innerText(), /2 KM/);
+    assert.match(await page.getByRole('dialog').innerText(), /Zona\s+5/);
+    assert.match(await page.getByRole('dialog').innerText(), /Semana\s+40/);
+    await page.keyboard.press('Escape');
+    await page.getByLabel('Unidad de evidencia', { exact: true }).selectOption('HR');
+    await page.getByText('163 registros', { exact: true }).waitFor();
+    await page.getByLabel('Unidad de evidencia', { exact: true }).selectOption('Todas');
     await page.getByRole('button', { name: 'Importar / pegar programación', exact: true }).click();
     await page.getByText('Pegar rango de Excel (TSV)', { exact: true }).click();
     await page.getByLabel('Rango de Excel', { exact: true }).fill('Finca\tLote\tTrabajo\tPeriodo\n900\t01\tMEC\tOctubre 2026');
@@ -94,7 +107,7 @@ try {
     await mapper.getByLabel('Período', { exact: true }).selectOption('3');
     await page.getByRole('button', { name: 'Validar importación' }).click();
     await page.getByRole('button', { name: 'Incorporar 1 registros' }).click();
-    await page.getByText('55 registros', { exact: true }).waitFor();
+    await page.getByText('201 registros', { exact: true }).waitFor();
     // Cancel and reject replacement without destroying either persisted source.
     await page.getByRole('button', { name: 'Importar Horas Máquina', exact: true }).click();
     await page.locator('.mec-import input[type=file]').setInputFiles({
@@ -103,15 +116,15 @@ try {
       buffer: bytes,
     });
     await page.getByRole('button', { name: 'Validar importación' }).click();
-    await page.getByRole('button', { name: 'Incorporar 54 registros' }).waitFor();
+    await page.getByRole('button', { name: 'Incorporar 200 registros' }).waitFor();
     await page
       .locator('.mec-import input[type=file]')
       .setInputFiles({ name: 'invalid.xlsx', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid') });
     await page.getByRole('button', { name: 'Validar importación' }).click();
     await page.locator('.mec-import [role=alert]').waitFor();
-    assert.equal(await page.getByRole('button', { name: 'Incorporar 54 registros' }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Incorporar 200 registros' }).count(), 0);
     await page.getByRole('button', { name: 'Cerrar importación' }).click();
-    await page.getByText('55 registros', { exact: true }).waitFor();
+    await page.getByText('201 registros', { exact: true }).waitFor();
     // Replace programming TSV with Excel, keeping HM untouched.
     const programBook = utils.book_new();
     utils.book_append_sheet(
@@ -134,10 +147,10 @@ try {
     await mapper.getByLabel('Período', { exact: true }).selectOption('3');
     await page.getByRole('button', { name: 'Validar importación' }).click();
     await page.getByRole('button', { name: 'Incorporar 1 registros' }).click();
-    await page.getByText('55 registros', { exact: true }).waitFor();
+    await page.getByText('201 registros', { exact: true }).waitFor();
     await page.reload();
     await navigate();
-    await page.getByText('55 registros', { exact: true }).waitFor();
+    await page.getByText('201 registros', { exact: true }).waitFor();
     // Use the existing Prefactura uploader, then verify its adapter and persistence.
     const pfBook = utils.book_new();
     utils.book_append_sheet(
@@ -190,14 +203,14 @@ try {
       });
     await page.getByRole('button', { name: 'Confirmar actualización' }).click();
     await navigate();
-    await page.getByText('56 registros', { exact: true }).waitFor();
+    await page.getByText('202 registros', { exact: true }).waitFor();
     await page.locator('.mec-source').filter({ hasText: 'Líneas de Prefactura' }).click();
     await page.getByRole('button', { name: 'Ver evidencia Prefactura fila 2', exact: true }).click();
     assert.match(await page.getByRole('dialog').innerText(), /000789/);
     await page.keyboard.press('Escape');
     await page.reload();
     await navigate();
-    await page.getByText('56 registros', { exact: true }).waitFor();
+    await page.getByText('202 registros', { exact: true }).waitFor();
     const notice = page.getByRole('button', { name: 'Cerrar aviso', exact: true });
     if (await notice.count()) await notice.click();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Tractor, FileSpreadsheet, CalendarDays, ArrowUpRight, X, Search } from 'lucide-react';
 import { FIELDS, openSource, openTSV, suggestMapping, normalizeSource } from './importers';
-import { inventory, coverage } from './model';
+import { inventory, coverage, unitDistribution } from './model';
 import { loadSources, saveSource } from './storage';
 import './mechanized.css';
 
@@ -62,7 +62,7 @@ function Importer({ kind, onClose, onImport }) {
       </div>
       <p>
         {kind === 'hm'
-          ? 'Seleccione una sola hoja del reporte. Revise el mapeo antes de incorporar registros HR.'
+          ? 'Seleccione una sola hoja del reporte. Se conservan las unidades originales, incluidas HR y KM, sin conversiones.'
           : 'Asigne las columnas de su formato real. La programación no demuestra ejecución ni deuda.'}
       </p>
       <label>
@@ -267,11 +267,14 @@ function Inspector({ row, onClose }) {
             ['Labor', row.labor],
             ['Descripción', row.laborName || row.serviceName],
             ['Fecha', row.date],
+            ['Zona', row.zone],
+            ['Semana', row.week],
             ['Período', row.period || `${row.periodStart || ''} ${row.periodEnd || ''}`],
             ['Cantidad', `${display(row.units)} ${row.unit || ''}`],
             ['Documento / P.FACT', row.document],
             ['Productor', row.producer],
             ['Servicio SAP', row.service],
+            ['Clasificación de origen', row.classification],
             ['Tarifa', row.tariff],
             ['Importe', row.total],
             ['Contratista', row.contractor],
@@ -317,6 +320,7 @@ export function MechanizedPanel({ prefactura = [], onLoadPrefactura }) {
     [query, setQuery] = useState(''),
     [labors, setLabors] = useState('MEC,ZGC,CCH');
   const [page, setPage] = useState(0);
+  const [unitFilter, setUnitFilter] = useState('Todas');
   useEffect(() => {
     let active = true;
     loadSources()
@@ -342,12 +346,13 @@ export function MechanizedPanel({ prefactura = [], onLoadPrefactura }) {
       rows.filter(
         (r) =>
           (sourceFilter === 'Todas' || r.source === sourceFilter) &&
+          (unitFilter === 'Todas' || (r.unit || 'Sin unidad') === unitFilter) &&
           [r.hacienda, r.haciendaCode, r.suerte, r.labor, r.producer, r.document, r.machine]
             .join(' ')
             .toLowerCase()
             .includes(query.toLowerCase()),
       ),
-    [rows, sourceFilter, query],
+    [rows, sourceFilter, query, unitFilter],
   );
   const pages = Math.max(1, Math.ceil(filtered.length / 50)),
     currentPage = Math.min(page, pages - 1);
@@ -398,6 +403,14 @@ export function MechanizedPanel({ prefactura = [], onLoadPrefactura }) {
               <strong>{data.length.toLocaleString('es-NI')}</strong>
               <span>{title}</span>
               <small>{coverage(data)}</small>
+              {key === 'HM' && (
+                <small>
+                  {unitDistribution(data)
+                    .map(([unit, count]) => `${count} ${unit}`)
+                    .join(' · ')}{' '}
+                  (registros)
+                </small>
+              )}
             </button>
           );
         })}
@@ -412,8 +425,8 @@ export function MechanizedPanel({ prefactura = [], onLoadPrefactura }) {
         <button onClick={onLoadPrefactura}>Cargar Prefactura existente</button>
       </div>
       <p className="mec-note">
-        HR y HA se conservan por separado. Programar no demuestra ejecución. Las fuentes locales se guardan solo en este
-        navegador.
+        HR, KM y HA se conservan por separado, sin sumar ni convertir cantidades entre unidades. Programar no demuestra ejecución.
+        Las fuentes locales se guardan solo en este navegador.
       </p>
       {error && (
         <p role="alert" className="mec-error">
@@ -481,7 +494,23 @@ export function MechanizedPanel({ prefactura = [], onLoadPrefactura }) {
               ))}
             </select>
           </label>
-          <label title="Filtro explícito de códigos; no crea equivalencias entre labores.">
+          <label>
+            Unidad
+            <select
+              aria-label="Unidad de evidencia"
+              value={unitFilter}
+              onChange={(e) => {
+                setUnitFilter(e.target.value);
+                setPage(0);
+              }}
+            >
+              <option>Todas</option>
+              {unitDistribution(rows).map(([unit]) => (
+                <option key={unit}>{unit}</option>
+              ))}
+            </select>
+          </label>
+          <label title="Filtro explícito de códigos; no clasifica líneas como mecanizadas ni crea equivalencias.">
             Labores de Prefactura
             <input
               value={labors}
@@ -494,7 +523,8 @@ export function MechanizedPanel({ prefactura = [], onLoadPrefactura }) {
         </div>
         <p className="mec-subtle">
           Filtro inicial MEC, ZGC, CCH; agregue otros códigos separados por coma. FTS no se convierte en MEC. Fechas mostradas:
-          extremos observados, no cobertura garantizada.
+          extremos observados, no cobertura garantizada. El código de labor no determina que una Prefactura sea mecanizada,
+          especialmente ZGC. Revisar servicio SAP, UM y clasificación de origen; clasificación definitiva pendiente de Etapa B.
         </p>
         <div className="mec-scroll" tabIndex="0" aria-label="Tabla de evidencia desplazable">
           <table>
