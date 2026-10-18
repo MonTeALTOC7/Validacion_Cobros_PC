@@ -89,6 +89,7 @@ jobs:
           if [ -n "$(git status --porcelain)" ]; then
             echo "::error::La raíz versionada no coincide con el build de la fuente. Ejecute 'npm run release' en app/ y versione el resultado."
             git status --porcelain
+            git diff -- sw.js
             exit 1
           fi
 
@@ -103,6 +104,9 @@ jobs:
 
       - name: Detalle navegable (drill-down) en escritorio y móvil
         run: node tests/e2e/drilldown.mjs --site ..
+
+      - name: Auditoría tarifaria aislada en escritorio y móvil
+        run: node tests/e2e/tariff-audit.mjs --site ..
 
       - name: Actualización desde v0.7 en el mismo origen
         run: node tests/e2e/upgrade.mjs

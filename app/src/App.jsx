@@ -16,7 +16,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { AuditPanel } from './components/AuditPanel';
+import { TariffAuditPanel } from './components/audit/TariffAuditPanel';
 import { FindingDrawer } from './components/FindingDrawer';
 import { FindingsTable } from './components/FindingsTable';
 import { ImportReviewDrawer } from './components/ImportReviewDrawer';
@@ -42,7 +42,7 @@ const NAV_ITEMS = [
   { id: 'tracking', label: 'Seguimiento de labores', icon: ChartColumn },
   { id: 'finance', label: 'Financiero', icon: Landmark },
   { id: 'tps', label: 'Paquetes TPS', icon: Sprout },
-  { id: 'audit', label: 'Auditoría y cierres', icon: ShieldCheck },
+  { id: 'audit', label: 'Auditoría de tarifas y cobros', icon: ShieldCheck },
   { id: 'load', label: 'Actualizar archivos', icon: Upload },
   { id: 'parameters', label: 'Parámetros', icon: Settings },
 ];
@@ -200,7 +200,7 @@ export function App() {
             </Panel>
           )}
           {view === 'audit' && (
-            <AuditPanel
+            <TariffAuditPanel
               analysis={analysis}
               inputs={inputs}
               parameters={parameters}
