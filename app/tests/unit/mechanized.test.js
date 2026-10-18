@@ -116,7 +116,7 @@ describe('Mecanizadas Etapa A', () => {
   });
   it('exige mapeo explícito de programación y admite período sin horas', async () => {
     const s = openTSV('Finca\tLote\tTrabajo\tPeriodo\tNota\n900\t01\tMEC\tOctubre 2026\t"Urea\nprogramada"');
-    expect(suggestMapping(s.sheets[0].matrix[0], 'program')).toEqual({});
+    expect(suggestMapping(s.sheets[0].matrix[0], 'program')).toEqual({ period: 3 });
     await expect(normalizeSource(s, 0, 0, {}, 'program')).rejects.toThrow('Asigne');
     const result = await normalizeSource(s, 0, 0, { haciendaCode: 0, suerte: 1, labor: 2, period: 3, product: 4 }, 'program');
     expect(result.rows[0]).toMatchObject({ units: null, period: 'Octubre 2026', product: 'Urea\nprogramada' });

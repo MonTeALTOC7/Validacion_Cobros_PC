@@ -20,7 +20,57 @@ export const FIELDS = [
   ['age', 'Edad suerte', ['Edad de la Suerte']],
   ['area', 'Área suerte', ['Area de la Suerte']],
   ['product', 'Insumo (opcional)', []],
+  ['year', 'Ejercicio', ['Ejercicio']],
+  ['startDate', 'Fecha Inicio', ['Fecha Inicio']],
+  ['endDate', 'Fecha Final', ['Fecha Final']],
+  ['executionDate', 'Fecha de ejecución', ['Fecha ejecuccion', 'Fecha ejecucion']],
+  ['productName', 'Descripción producto', ['Desc. Producto']],
+  ['dose', 'Dosis', ['Dosis']],
+  ['productQuantity', 'Cantidad de producto', ['Cantidad']],
+  ['user', 'Usuario SIAGRI', ['Usuario']],
+  ['zoneName', 'Nombre Zona', ['Nombre Zona']],
+  ['warehouse', 'Bodega', ['Bodega']],
+  ['warehouseName', 'Nombre Bodega', ['Nombre Bodega']],
+  ['executed', 'Ejecutado', ['Ejecutado?']],
+  ['suspended', 'Suspendida', ['Suspendida? (0=No)']],
+  ['reserved', 'Con Reserva', ['Con Reserva?']],
 ];
+const headerKey = (v) => normalizeText(v).replace(/\s+/g, '');
+const PROGRAM_ALIASES = {
+  laborName: ['Nombre Labor'],
+  unit: ['Unidad de Medida'],
+  units: ['Unidades'],
+  product: ['Producto'],
+  document: ['Documento'],
+};
+
+export function parseSiagriDate(value) {
+  if (typeof value !== 'string') return toIsoDate(value);
+  const match = normalizeText(value).match(/^(\d{1,2})-([A-Z]{3})\.?-(\d{2}|\d{4})$/);
+  if (!match) return toIsoDate(value);
+  const month = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'].indexOf(match[2]) + 1;
+  if (!month) return '';
+  const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+  return toIsoDate(`${year}-${String(month).padStart(2, '0')}-${match[1].padStart(2, '0')}`);
+}
+
+export function detectHeaderRow(matrix, kind) {
+  let best = 0,
+    score = 0;
+  matrix.slice(0, 100).forEach((row, index) => {
+    const mapping = suggestMapping(row, kind);
+    if (
+      (mapping.haciendaCode !== undefined || mapping.hacienda !== undefined) &&
+      mapping.labor !== undefined &&
+      mapping.suerte !== undefined &&
+      Object.keys(mapping).length > score
+    ) {
+      best = index;
+      score = Object.keys(mapping).length;
+    }
+  });
+  return best;
+}
 const text = (v) => String(v ?? '').trim();
 export const digest = async (value) => {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -69,11 +119,10 @@ export function openTSV(input) {
 }
 
 export function suggestMapping(headers, kind) {
-  // Programming has no known schema: the operator explicitly maps its columns.
-  if (kind === 'program') return {};
   const mapping = {};
   for (const [field, , aliases] of FIELDS) {
-    const index = headers.findIndex((h) => aliases.some((a) => normalizeText(a) === normalizeText(h)));
+    const candidates = kind === 'program' ? PROGRAM_ALIASES[field] || aliases : aliases;
+    const index = headers.findIndex((h) => candidates.some((a) => headerKey(a) === headerKey(h)));
     if (index >= 0) mapping[field] = index;
   }
   const repeatedLabor = headers.map((h, i) => (normalizeText(h) === 'LABOR' ? i : -1)).filter((i) => i >= 0);
@@ -90,7 +139,7 @@ export async function normalizeSource(source, sheetIndex, headerRow, mapping, ki
   const required = ['suerte', 'labor', ...(kind === 'hm' ? ['unit', 'units'] : [])];
   if (
     (!mapped('haciendaCode') && !mapped('hacienda')) ||
-    (!mapped('date') && !mapped('period')) ||
+    (!mapped('date') && !mapped('period') && !(kind === 'program' && mapped('startDate'))) ||
     required.some((key) => !mapped(key))
   )
     throw new Error('Asigne hacienda, suerte, labor y fecha o período; HM requiere también unidad y cantidad.');
@@ -109,12 +158,20 @@ export async function normalizeSource(source, sheetIndex, headerRow, mapping, ki
     row.date = get('date') === '' ? '' : toIsoDate(get('date'));
     row.labor = normalizeText(get('labor'));
     row.unit = normalizeText(get('unit'));
+    if (kind === 'program') {
+      for (const key of ['date', 'startDate', 'endDate', 'executionDate'])
+        row[key] = get(key) === '' ? '' : parseSiagriDate(get(key));
+      for (const key of ['executed', 'suspended', 'reserved']) row[key] = normalizeText(get(key));
+    }
     const quantity = parseNumberCell(get('units'));
     row.units = quantity.empty ? null : quantity.value;
     const reasons = [];
     if (!row.haciendaCode && !row.hacienda) reasons.push('Hacienda vacía');
     if (!row.suerte || !row.labor) reasons.push('Suerte o labor vacía');
-    if ((get('date') !== '' && !row.date) || (!row.date && !row.period)) reasons.push('Fecha inválida o período ausente');
+    if ((get('date') !== '' && !row.date) || (!row.date && !row.period && !row.startDate))
+      reasons.push('Fecha inválida o período ausente');
+    if (kind === 'program' && ['startDate', 'endDate', 'executionDate'].some((key) => get(key) !== '' && !row[key]))
+      reasons.push('Fecha SIAGRI inválida');
     if (kind === 'hm' && !row.unit) reasons.push('Unidad vacía');
     if ((kind === 'hm' && (quantity.empty || quantity.value <= 0)) || !quantity.valid) reasons.push('Cantidad inválida');
     const reference = { sourceFile: source.name, sourceSheet: sheet.name, sourceRow: i + 1 };

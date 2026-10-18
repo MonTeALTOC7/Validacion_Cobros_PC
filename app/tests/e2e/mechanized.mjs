@@ -3,6 +3,7 @@ import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { serve, launch } from './harness.mjs';
+import { programHeaders, programRows } from '../fixtures/programming.js';
 const { utils, write } = createRequire(import.meta.url)('xlsx');
 const workbook = utils.book_new();
 const header = [
@@ -152,6 +153,27 @@ try {
     await navigate();
     await page.getByText('201 registros', { exact: true }).waitFor();
     // Use the existing Prefactura uploader, then verify its adapter and persistence.
+    const programTSV = [['Título sintético'], programHeaders, ...programRows].map((r) => r.join('\t')).join('\n');
+    await page.getByRole('button', { name: 'Importar / pegar programación', exact: true }).click();
+    await page.getByText('Pegar rango de Excel (TSV)', { exact: true }).click();
+    await page.getByLabel('Rango de Excel', { exact: true }).fill(programTSV);
+    await page.getByRole('button', { name: 'Leer rango', exact: true }).click();
+    await page.getByRole('button', { name: 'Validar importación', exact: true }).click();
+    await page.getByRole('button', { name: 'Incorporar 84 registros', exact: true }).click();
+    const statuses = page.getByRole('region', { name: 'Estados de programación' });
+    assert.match(await statuses.innerText(), /59 ejecutadas.*25 no ejecutadas/);
+    assert.match(await statuses.innerText(), /22 suspendidas.*3 no suspendidas/);
+    const fullProgram = utils.book_new();
+    utils.book_append_sheet(fullProgram, utils.aoa_to_sheet([['Título sintético'], programHeaders, ...programRows]), 'Plan');
+    await page.getByRole('button', { name: 'Importar / pegar programación', exact: true }).click();
+    await page.locator('.mec-import input[type=file]').setInputFiles({
+      name: 'plan-sintetico.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer: write(fullProgram, { type: 'buffer', bookType: 'xlsx' }),
+    });
+    await page.getByRole('button', { name: 'Validar importación', exact: true }).click();
+    await page.getByRole('button', { name: 'Incorporar 84 registros', exact: true }).click();
+    await page.getByText('284 registros', { exact: true }).waitFor();
     const pfBook = utils.book_new();
     utils.book_append_sheet(
       pfBook,
@@ -191,26 +213,23 @@ try {
       ]),
       'REPORTE',
     );
-    await page.getByRole('button', { name: 'Cargar Prefactura existente' }).click();
-    await page
-      .locator('.file-card')
-      .filter({ hasText: 'Reporte de Prefactura' })
-      .locator('input')
-      .setInputFiles({
-        name: 'prefactura-sintetica.xlsx',
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        buffer: write(pfBook, { bookType: 'xlsx', type: 'buffer' }),
-      });
+    assert.match(await page.getByRole('region', { name: 'Disponibilidad Prefactura' }).innerText(), /no disponible/);
+    await page.getByLabel('Archivo Prefactura', { exact: true }).setInputFiles({
+      name: 'prefactura-sintetica.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer: write(pfBook, { bookType: 'xlsx', type: 'buffer' }),
+    });
     await page.getByRole('button', { name: 'Confirmar actualización' }).click();
-    await navigate();
-    await page.getByText('202 registros', { exact: true }).waitFor();
+    await page.getByText('285 registros', { exact: true }).waitFor();
+    assert.match(await page.getByRole('region', { name: 'Disponibilidad Prefactura' }).innerText(), /en uso automático/);
     await page.locator('.mec-source').filter({ hasText: 'Líneas de Prefactura' }).click();
     await page.getByRole('button', { name: 'Ver evidencia Prefactura fila 2', exact: true }).click();
     assert.match(await page.getByRole('dialog').innerText(), /000789/);
     await page.keyboard.press('Escape');
     await page.reload();
     await navigate();
-    await page.getByText('202 registros', { exact: true }).waitFor();
+    await page.getByText('285 registros', { exact: true }).waitFor();
+    assert.match(await page.getByRole('region', { name: 'Disponibilidad Prefactura' }).innerText(), /prefactura-sintetica.xlsx/);
     const notice = page.getByRole('button', { name: 'Cerrar aviso', exact: true });
     if (await notice.count()) await notice.click();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
@@ -221,6 +240,15 @@ try {
     await page.screenshot({ path: path.join(shots, `${label}-evidencia.png`), fullPage: false });
     await page.keyboard.press('Escape');
     assert.equal(await page.getByRole('dialog').count(), 0);
+    await page.locator('.mec-source').filter({ hasText: 'Registros programados' }).click();
+    await page.getByRole('button', { name: 'Ver evidencia Programación fila 3', exact: true }).click();
+    const programInspector = await page.getByRole('dialog').innerText();
+    assert.match(programInspector, /2026-02-23/);
+    assert.match(programInspector, /2026-03-01/);
+    assert.match(programInspector, /2026-03-04/);
+    assert.match(programInspector, /59.7/);
+    await page.screenshot({ path: path.join(shots, `${label}-programacion.png`), fullPage: false });
+    await page.keyboard.press('Escape');
     assert.deepEqual(errors, []);
     console.log(
       `OK ${label}: importación Excel/TSV, exclusiones, paginación, persistencia, inspector, cuarta pestaña y ancho responsive`,

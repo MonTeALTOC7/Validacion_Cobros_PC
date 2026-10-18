@@ -5,6 +5,19 @@
   gap: 18px;
   min-width: 0;
 }
+.reconciliation-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.reconciliation-tabs [aria-selected='true'] {
+  background: #0b5946;
+  color: white;
+}
+.mec-prefactura-upload {
+  max-width: 290px;
+}
 .mec-module button {
   cursor: pointer;
   border: 1px solid #cfdfd8;

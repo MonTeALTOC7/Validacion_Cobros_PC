@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Tractor, FileSpreadsheet, CalendarDays, ArrowUpRight, X, Search } from 'lucide-react';
-import { FIELDS, openSource, openTSV, suggestMapping, normalizeSource } from './importers';
-import { inventory, coverage, unitDistribution } from './model';
+import { FIELDS, openSource, openTSV, suggestMapping, normalizeSource, detectHeaderRow } from './importers';
+import { inventory, coverage, unitDistribution, programmingEvents } from './model';
 import { loadSources, saveSource } from './storage';
 import './mechanized.css';
 
@@ -29,7 +29,7 @@ function Importer({ kind, onClose, onImport }) {
     [busy, setBusy] = useState(false);
   const matrix = source?.sheets[sheet]?.matrix ?? [];
   const headers = matrix[header] ?? [];
-  function configure(next, index = 0, row = 0) {
+  function configure(next, index = 0, row = detectHeaderRow(next.sheets[index].matrix, kind)) {
     setSource(next);
     setSheet(index);
     setHeader(row);
@@ -63,7 +63,7 @@ function Importer({ kind, onClose, onImport }) {
       <p>
         {kind === 'hm'
           ? 'Seleccione una sola hoja del reporte. Se conservan las unidades originales, incluidas HR y KM, sin conversiones.'
-          : 'Asigne las columnas de su formato real. La programación no demuestra ejecución ni deuda.'}
+          : 'Formato SIAGRI reconocido automáticamente; revise el mapeo y ajústelo si hace falta. Ejecución reportada no demuestra respaldo de cobro.'}
       </p>
       <label>
         Archivo Excel
@@ -269,6 +269,19 @@ function Inspector({ row, onClose }) {
             ['Fecha', row.date],
             ['Zona', row.zone],
             ['Semana', row.week],
+            ['Ejercicio SIAGRI', row.year],
+            ['Fecha Inicio', row.startDate],
+            ['Fecha Final', row.endDate],
+            ['Fecha de ejecución reportada', row.executionDate],
+            ['Ejecutado', row.executed],
+            ['Suspendida (0=No)', row.suspended],
+            ['Con Reserva', row.reserved],
+            ['Producto', row.product],
+            ['Descripción producto', row.productName],
+            ['Dosis', row.dose],
+            ['Cantidad de producto', row.productQuantity],
+            ['Bodega', row.warehouse],
+            ['Nombre Bodega', row.warehouseName],
             ['Período', row.period || `${row.periodStart || ''} ${row.periodEnd || ''}`],
             ['Cantidad', `${display(row.units)} ${row.unit || ''}`],
             ['Documento / P.FACT', row.document],
@@ -310,7 +323,7 @@ function Inspector({ row, onClose }) {
   );
 }
 
-export function MechanizedPanel({ prefactura = [], onLoadPrefactura }) {
+export function MechanizedPanel({ prefactura = [], prefacturaFile, onPrefacturaFile, importBusy }) {
   const [sources, setSources] = useState({}),
     [ready, setReady] = useState(false),
     [error, setError] = useState('');
@@ -341,6 +354,8 @@ export function MechanizedPanel({ prefactura = [], onLoadPrefactura }) {
     () => inventory(sources.hm?.rows ?? [], prefactura, sources.program?.rows ?? [], labors),
     [sources, prefactura, labors],
   );
+  const programs = sources.program?.rows ?? [];
+  const events = useMemo(() => programmingEvents(programs), [sources.program]);
   const filtered = useMemo(
     () =>
       rows.filter(
@@ -422,8 +437,55 @@ export function MechanizedPanel({ prefactura = [], onLoadPrefactura }) {
         <button disabled={!ready} onClick={() => setImportKind('program')}>
           Importar / pegar programación
         </button>
-        <button onClick={onLoadPrefactura}>Cargar Prefactura existente</button>
+        <label className="mec-prefactura-upload">
+          {prefactura.length ? 'Actualizar Prefactura' : 'Importar Prefactura'}
+          <input
+            aria-label="Archivo Prefactura"
+            type="file"
+            accept=".xlsx,.xls"
+            disabled={importBusy}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onPrefacturaFile(file);
+              e.target.value = '';
+            }}
+          />
+        </label>
       </div>
+      <section className="mec-note" aria-label="Disponibilidad Prefactura">
+        <strong>Prefactura {prefactura.length ? 'disponible · en uso automático' : 'no disponible'}</strong>
+        <p>
+          {prefacturaFile?.name || 'Sin archivo cargado'} · {prefacturaFile?.dateStart || 'Sin fecha inicial'} a{' '}
+          {prefacturaFile?.dateEnd || 'Sin fecha final'} · {prefactura.length} filas disponibles ·{' '}
+          {rows.filter((r) => r.source === 'Prefactura').length} filas de labores seleccionadas.
+        </p>
+        <small>Datos de este navegador y origen. Preview y GitHub Pages no comparten automáticamente sus fuentes.</small>
+      </section>
+      {!!programs.length && (
+        <section className="mec-note" aria-label="Estados de programación">
+          <strong>{programs.length} líneas de programación</strong>
+          <p>
+            {programs.filter((r) => r.executed === 'SI').length} ejecutadas según SIAGRI ·{' '}
+            {programs.filter((r) => r.executed === 'NO').length} no ejecutadas ·{' '}
+            {programs.filter((r) => !['SI', 'NO'].includes(r.executed)).length} sin estado reconocido.
+          </p>
+          <p>
+            No ejecutadas: {programs.filter((r) => r.executed === 'NO' && ['SI', '1'].includes(r.suspended)).length} suspendidas ·{' '}
+            {programs.filter((r) => r.executed === 'NO' && ['NO', '0'].includes(r.suspended)).length} no suspendidas.
+          </p>
+          <small>SI es ejecución reportada, no prueba de cobro. NO no genera alerta de cobro faltante.</small>
+          <details>
+            <summary>{events.length} grupos documentales candidatos · sin sumar superficies de productos</summary>
+            {events.map((event, i) => (
+              <p key={event.key}>
+                Grupo {i + 1} · Documento {event.lines[0].document || 'ausente'} · {event.lines.length} líneas · Superficie de
+                trabajo {event.workQuantity == null ? 'requiere revisión' : `${event.workQuantity} ${event.unit}`}{' '}
+                {event.reviewRequired ? '· validar si es un mismo evento' : ''}
+              </p>
+            ))}
+          </details>
+        </section>
+      )}
       <p className="mec-note">
         HR, KM y HA se conservan por separado, sin sumar ni convertir cantidades entre unidades. Programar no demuestra ejecución.
         Las fuentes locales se guardan solo en este navegador.
@@ -551,7 +613,14 @@ export function MechanizedPanel({ prefactura = [], onLoadPrefactura }) {
                     {r.labor}
                     <small>{r.laborName || r.serviceName}</small>
                   </td>
-                  <td>{display(r.date || r.period)}</td>
+                  <td>
+                    {display(r.date || r.startDate || r.period)}
+                    {r.source === 'Programación' && (
+                      <small>
+                        Ejecutado: {display(r.executed)} · Suspendida: {display(r.suspended)}
+                      </small>
+                    )}
+                  </td>
                   <td>
                     {display(r.units)} <small>{r.unit}</small>
                   </td>

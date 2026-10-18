@@ -124,6 +124,12 @@ export async function tabTexts(page, labels) {
   const out = {};
   for (const label of labels) {
     const button = page.locator('.sidebar nav button', { hasText: label }).first();
+    if (label === 'Paquetes TPS' && !(await button.count())) {
+      await page.locator('.sidebar nav button', { hasText: 'Conciliación Nómina' }).click();
+      await page.getByRole('tab', { name: 'Paquetes TPS', exact: true }).click();
+      out[label] = await page.evaluate(() => document.querySelector('main')?.innerText ?? '');
+      continue;
+    }
     if (!(await button.count())) {
       out[label] = null;
       continue;

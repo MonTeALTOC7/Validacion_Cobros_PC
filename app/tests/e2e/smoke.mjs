@@ -44,7 +44,11 @@ try {
     const { context, page, errors } = await openAndWait(browser, `${origin}/app/index.html`, { viewport });
     const clickNav = async (tab) => {
       if (label === 'movil') await page.locator('.menu-button').click();
-      await page.locator('.sidebar nav button', { hasText: tab }).first().click();
+      await page
+        .locator('.sidebar nav button', { hasText: tab === 'Paquetes TPS' ? 'Conciliación Nómina' : tab })
+        .first()
+        .click();
+      if (tab === 'Paquetes TPS') await page.getByRole('tab', { name: 'Paquetes TPS', exact: true }).click();
       await page.waitForTimeout(600);
     };
     for (const tab of TABS) {
@@ -60,6 +64,23 @@ try {
         });
     }
     if (label === 'escritorio') {
+      await clickNav('Paquetes TPS');
+      check(
+        'TPS retirado del menú principal',
+        (await page.locator('.sidebar nav button', { hasText: 'Paquetes TPS' }).count()) === 0,
+      );
+      check(
+        'Seguimiento conserva cuarta posición',
+        (await page.locator('.sidebar nav button').nth(3).innerText()) === 'Seguimiento de labores',
+      );
+      await page.locator('table tbody tr').first().click();
+      check('TPS mantiene drill-down', await page.locator('.drawer').isVisible());
+      await page.locator('.drawer-head button').click();
+      const [tpsDownload] = await Promise.all([
+        page.waitForEvent('download'),
+        page.locator('button', { hasText: 'Exportar vista' }).first().click(),
+      ]);
+      check('TPS mantiene exportación', /^paquetes_tps_.*\.xlsx$/.test(tpsDownload.suggestedFilename()));
       // Conciliación: columna de tarifa y detalle con evidencia
       await clickNav('Conciliación');
       const header = await page.locator('table thead').first().innerText();
