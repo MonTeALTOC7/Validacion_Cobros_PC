@@ -43,6 +43,7 @@ export function programmingEvents(rows) {
       'labor',
       'year',
       'week',
+      'zone',
       'startDate',
       'endDate',
       'executionDate',
@@ -62,7 +63,8 @@ export function programmingEvents(rows) {
   return [...groups.entries()].map(([key, lines]) => {
     const quantities = new Set(lines.map((r) => r.units));
     const products = new Set(lines.map((r) => r.product));
-    const ambiguous = quantities.size !== 1 || products.size !== lines.length || lines.some((r) => !r.product || r.units == null);
+    const ambiguous =
+      quantities.size !== 1 || products.size !== lines.length || lines.some((r) => !r.document || !r.product || r.units == null);
     return {
       key,
       lines,

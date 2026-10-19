@@ -39,6 +39,7 @@ jobs:
         working-directory: app
     env:
       TZ: America/Managua
+      CASUR_CI_RESULTS: ${{ runner.temp }}/casur-ci-results.json
     steps:
       - uses: actions/checkout@v5
         with:
@@ -57,10 +58,10 @@ jobs:
         run: npx prettier --check src tests scripts
 
       - name: Pruebas unitarias y cifras de referencia (golden)
-        run: npm test
+        run: node scripts/private-ci-check.mjs unit node node_modules/vitest/vitest.mjs run
 
       - name: Pruebas unitarias y cifras de referencia en otra zona horaria (Asia/Tokyo)
-        run: TZ=Asia/Tokyo npx vitest run --exclude tests/unit/timezone.test.js
+        run: TZ=Asia/Tokyo node scripts/private-ci-check.mjs unit-tokyo node node_modules/vitest/vitest.mjs run --exclude tests/unit/timezone.test.js
 
       - name: Registro de cifras de referencia (solo crece; cambios visibles)
         run: |
@@ -71,7 +72,7 @@ jobs:
           else
             BASE=""
           fi
-          node scripts/golden-guard.mjs "$BASE"
+          node scripts/private-ci-check.mjs golden-guard node scripts/golden-guard.mjs "$BASE"
 
       - name: Copias de referencia idénticas (legacy v0.7 y build v0.8 previo)
         run: |
@@ -97,30 +98,35 @@ jobs:
         run: npx playwright-core install --with-deps chromium
 
       - name: Humo (app/dist)
-        run: node tests/e2e/smoke.mjs
+        run: node scripts/private-ci-check.mjs smoke-dist node tests/e2e/smoke.mjs
 
       - name: Humo (raíz publicada)
-        run: node tests/e2e/smoke.mjs --site ..
+        run: node scripts/private-ci-check.mjs smoke-root node tests/e2e/smoke.mjs --site ..
 
       - name: Detalle navegable (drill-down) en escritorio y móvil
-        run: node tests/e2e/drilldown.mjs --site ..
+        run: node scripts/private-ci-check.mjs drilldown node tests/e2e/drilldown.mjs --site ..
 
       - name: Auditoría tarifaria aislada en escritorio y móvil
-        run: node tests/e2e/tariff-audit.mjs --site ..
+        run: node scripts/private-ci-check.mjs tariff-audit node tests/e2e/tariff-audit.mjs --site ..
 
       - name: Importadores mecanizados Etapa A (datos sintéticos)
         run: node tests/e2e/mechanized.mjs
         env:
           MECHANIZED_SHOTS: ${{ runner.temp }}/mechanized-shots
 
+      - name: Conciliación mecanizada Etapa B, migración y decisiones (datos sintéticos)
+        run: node tests/e2e/mechanized-b.mjs
+        env:
+          MECHANIZED_B_SHOTS: ${{ runner.temp }}/mechanized-b-shots
+
       - name: Actualización desde v0.7 en el mismo origen
-        run: node tests/e2e/upgrade.mjs
+        run: node scripts/private-ci-check.mjs upgrade node tests/e2e/upgrade.mjs
 
       - name: Zona horaria del equipo y transición desde v0.8 previo
-        run: node tests/e2e/timezone.mjs --site ..
+        run: node scripts/private-ci-check.mjs timezone node tests/e2e/timezone.mjs --site ..
 
       - name: Comparación con el legacy (solo diferencias permitidas)
-        run: node tests/e2e/compare-legacy.mjs --allowlist tests/golden/legacy-allowlist.json --out ../compare-legacy.json
+        run: node scripts/private-ci-check.mjs compare-legacy node tests/e2e/compare-legacy.mjs --allowlist tests/golden/legacy-allowlist.json
 
       - name: Repositorio de la App Maestra en el commit fijado (solo lectura)
         uses: actions/checkout@v5
@@ -149,8 +155,8 @@ jobs:
 
       - name: Compatibilidad con la vista de labores de la App Maestra (obligatoria)
         run: |
-          node tests/e2e/upgrade.mjs --labores ../maestra/modules/labores
-          npx vite-node tests/e2e/maestra-compat.mjs -- --labores ../maestra/modules/labores --out ../maestra-compat.json
+          node scripts/private-ci-check.mjs upgrade-maestra node tests/e2e/upgrade.mjs --labores ../maestra/modules/labores
+          node scripts/private-ci-check.mjs maestra node node_modules/vite-node/vite-node.mjs tests/e2e/maestra-compat.mjs -- --labores ../maestra/modules/labores
 
       - name: Informes
         if: always()
@@ -158,7 +164,8 @@ jobs:
         with:
           name: informes
           path: |
-            compare-legacy.json
-            maestra-compat.json
+            ${{ runner.temp }}/casur-ci-results.json
+            ${{ runner.temp }}/mechanized-shots
+            ${{ runner.temp }}/mechanized-b-shots
             maestra-ref.txt
           if-no-files-found: ignore

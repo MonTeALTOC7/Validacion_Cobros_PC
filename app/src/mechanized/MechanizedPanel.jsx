@@ -4,18 +4,9 @@ import { FIELDS, openSource, openTSV, suggestMapping, normalizeSource, detectHea
 import { inventory, coverage, unitDistribution, programmingEvents } from './model';
 import { loadSources, saveSource } from './storage';
 import './mechanized.css';
+import { ReconciliationBoard } from './ReconciliationBoard';
 
 const LABELS = { hm: 'Horas Máquina', program: 'Programación de insumos' };
-const FUTURE = [
-  'Trabajos con Prefactura localizada',
-  'Prefacturados confirmados',
-  'Trabajos sin cobro localizado',
-  'Prefacturas sin HM',
-  'Programaciones por comprobar',
-  'Posibles errores de registro',
-  'Posibles duplicados',
-  'Casos pendientes de validación',
-];
 const display = (value) => (value === '' || value == null ? '—' : String(value));
 
 function Importer({ kind, onClose, onImport }) {
@@ -260,7 +251,8 @@ function Inspector({ row, onClose }) {
           </button>
         </div>
         <p className="mec-note">
-          Pendiente de conciliación. Esta ficha muestra el registro importado; no confirma ejecución ni respaldo de cobro.
+          Esta ficha conserva el registro importado. Consulte el caso en la bandeja de conciliación para revisar coincidencias y
+          decisiones.
         </p>
         <dl>
           {[
@@ -317,7 +309,7 @@ function Inspector({ row, onClose }) {
             </dl>
           </details>
         )}
-        <p>Vínculos, decisiones e historial estarán disponibles tras la aprobación de la Etapa B.</p>
+        <p>Vínculos, decisiones e historial disponibles en el inspector de la bandeja de conciliación.</p>
       </section>
     </div>
   );
@@ -394,9 +386,9 @@ export function MechanizedPanel({ prefactura = [], prefacturaFile, onPrefacturaF
         </div>
         <div className="mec-stage">
           <Tractor size={38} />
-          <strong>Etapa A</strong>
-          <span>Prototipo de importación</span>
-          <small>Conciliación aún no evaluada</small>
+          <strong>Etapa B</strong>
+          <span>Conciliación documental</span>
+          <small>Revisión humana con trazabilidad</small>
         </div>
       </section>
       <div className="mec-sources">
@@ -508,18 +500,7 @@ export function MechanizedPanel({ prefactura = [], prefacturaFile, onPrefacturaF
           }}
         />
       )}
-      <details className="mec-roadmap">
-        <summary>Indicadores de conciliación · disponibles en Etapa B</summary>
-        <div className="mec-kpis">
-          {FUTURE.map((label) => (
-            <div key={label}>
-              <strong>—</strong>
-              <span>{label}</span>
-              <small>No evaluado</small>
-            </div>
-          ))}
-        </div>
-      </details>
+      {ready && <ReconciliationBoard sources={sources} prefactura={prefactura} />}
       <section className="mec-inbox">
         <div className="mec-heading">
           <div>
@@ -586,7 +567,8 @@ export function MechanizedPanel({ prefactura = [], prefacturaFile, onPrefacturaF
         <p className="mec-subtle">
           Filtro inicial MEC, ZGC, CCH; agregue otros códigos separados por coma. FTS no se convierte en MEC. Fechas mostradas:
           extremos observados, no cobertura garantizada. El código de labor no determina que una Prefactura sea mecanizada,
-          especialmente ZGC. Revisar servicio SAP, UM y clasificación de origen; clasificación definitiva pendiente de Etapa B.
+          especialmente ZGC. Revisar servicio SAP, UM y clasificación de origen; las reglas del motor se explican en cada caso de
+          conciliación.
         </p>
         <div className="mec-scroll" tabIndex="0" aria-label="Tabla de evidencia desplazable">
           <table>

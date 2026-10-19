@@ -5,6 +5,125 @@
   gap: 18px;
   min-width: 0;
 }
+.mec-reconciliation {
+  background: #fff;
+  border: 1px solid #d4e3dc;
+  border-radius: 18px;
+  padding: 22px;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.mec-reconciliation h3,
+.mec-reconciliation p {
+  margin: 0;
+}
+.mec-reconciliation p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.mec-reconciliation .mec-kpis button {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  gap: 7px;
+}
+.mec-reconciliation .mec-kpis button[aria-pressed='true'] {
+  background: #e4f2ea;
+  border-color: #0b5946;
+}
+.mec-reconciliation .mec-kpis strong {
+  font-size: 28px;
+}
+.mec-reconciliation .mec-kpis span {
+  font-size: 12px;
+}
+.mec-reconciliation .mec-kpis small {
+  color: #5e7469;
+}
+.mec-reconciliation label,
+.mec-case-drawer > label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  margin: 8px 0;
+}
+.mec-reconciliation input,
+.mec-reconciliation select,
+.mec-case-drawer input,
+.mec-case-drawer select,
+.mec-case-drawer textarea {
+  max-width: 100%;
+  min-width: 0;
+  border: 1px solid #b9d0c4;
+  border-radius: 7px;
+  padding: 9px;
+  background: white;
+  color: #173b34;
+}
+.mec-reconciliation .mec-controls > label {
+  flex: 1 1 150px;
+}
+.mec-rules {
+  background: #f3f7f4;
+  border-radius: 12px;
+  padding: 14px;
+}
+.mec-warning {
+  background: #fff5df;
+  padding: 12px;
+  border-left: 3px solid #bb8a20;
+  font-size: 12px;
+}
+.mec-evidence-card {
+  border: 1px solid #ccdcd2;
+  border-radius: 12px;
+  padding: 14px;
+  margin: 12px 0;
+}
+.mec-case-drawer {
+  width: min(720px, 100vw);
+}
+.mec-case-drawer .mec-check {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 12px;
+}
+.mec-case-drawer .mec-check input[type='checkbox'] {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #0b5946;
+}
+.mec-reconciliation {
+  scroll-margin-top: 100px;
+}
+.mec-case-drawer textarea {
+  min-height: 90px;
+}
+.mec-case-drawer h3 {
+  margin: 24px 0 12px;
+}
+.mec-json {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  max-height: 400px;
+  overflow: auto;
+  background: #f2f6f3;
+  padding: 10px;
+}
+@media (max-width: 700px) {
+  .mec-reconciliation {
+    padding: 13px;
+  }
+  .mec-reconciliation .mec-controls > label {
+    flex-basis: 100%;
+  }
+}
 .reconciliation-tabs {
   display: flex;
   flex-wrap: wrap;
