@@ -39,7 +39,6 @@ jobs:
         working-directory: app
     env:
       TZ: America/Managua
-      CASUR_CI_RESULTS: ${{ runner.temp }}/casur-ci-results.json
     steps:
       - uses: actions/checkout@v5
         with:
@@ -53,6 +52,9 @@ jobs:
 
       - name: Instalación reproducible
         run: npm ci
+
+      - name: Informe de CI sin registros de productores
+        run: echo "CASUR_CI_RESULTS=$RUNNER_TEMP/casur-ci-results.json" >> "$GITHUB_ENV"
 
       - name: Formato
         run: npx prettier --check src tests scripts
